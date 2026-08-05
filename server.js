@@ -4,7 +4,7 @@
  * 模块2：小型工具管理台账（档案/借还/维修/报废/盘点/报表/权限）
  * 技术：Node.js 内置 http + node:sqlite（免费、零安装、单文件数据库）
  *
- * 程序设计：吴灵华
+ * 程序设计：Mr WU
  */
 const http = require('http');
 const fs = require('fs');
@@ -24,7 +24,7 @@ let db = new DatabaseSync(DB_FILE);
 
 /* ============ 程序元信息 ============ */
 const APP_INFO = {
-  author: '吴灵华',
+  author: 'Mr WU',
   // 大版本号：每次大改手动+1；小版本：基于 changelog 条数自动计算
   major: 1
 };

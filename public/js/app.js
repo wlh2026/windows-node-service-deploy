@@ -91,10 +91,10 @@ const App = {
         <button onclick="App.logout()">退出</button>
       </div>`;
     document.body.prepend(bar);
-    // 页面底部加 "程序设计：吴灵华" + 版本号
+    // 页面底部加 "程序设计：Mr WU" + 版本号
     const foot = document.createElement('div');
     foot.className = 'page-foot';
-    foot.innerHTML = `<span>程序设计：<b id="footAuthor">吴灵华</b></span><span>当前版本：<b id="footVer">v…</b></span><span>四福车间管理系统 © ${new Date().getFullYear()}</span>`;
+    foot.innerHTML = `<span>程序设计：<b id="footAuthor">Mr WU</b></span><span>当前版本：<b id="footVer">v…</b></span><span>四福车间管理系统 © ${new Date().getFullYear()}</span>`;
     document.body.appendChild(foot);
     // 无写权限时隐藏 .need-write
     if (!this.canWrite()) {
@@ -111,7 +111,7 @@ const App = {
     // 异步拉取真实版本号并局部刷新
     this.get('/api/version').then(info => {
       const v = info && info.version || '0.0.0';
-      const av = (info && info.author) || '吴灵华';
+      const av = (info && info.author) || 'Mr WU';
       const a = document.getElementById('appVer'); if (a) a.textContent = 'v' + v;
       const f = document.getElementById('footVer'); if (f) f.textContent = 'v' + v;
       const fa = document.getElementById('footAuthor'); if (fa) fa.textContent = av;
