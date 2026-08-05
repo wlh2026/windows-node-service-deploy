@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>四福车间管理系统 · 使用说明书（按角色）</title>
+<style>
+  :root{
+    --blue:#1F3864; --blue2:#2E5496; --accent:#C00000; --green:#1E7B34;
+    --orange:#C55A11; --gray:#5A6573; --bg:#F4F6FA; --line:#D9E0EA; --card:#fff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;color:#222;background:var(--bg);line-height:1.7}
+  header{background:linear-gradient(120deg,var(--blue),var(--blue2));color:#fff;padding:34px 48px}
+  header h1{margin:0;font-size:26px;letter-spacing:1px}
+  header .sub{margin-top:8px;opacity:.9;font-size:14px}
+  .wrap{display:flex;max-width:1180px;margin:0 auto}
+  nav.toc{width:230px;flex:none;padding:22px 16px;position:sticky;top:0;align-self:flex-start;height:100vh;overflow:auto}
+  nav.toc a{display:block;color:var(--blue2);text-decoration:none;padding:7px 10px;border-radius:6px;font-size:13.5px}
+  nav.toc a:hover{background:#e8eef7}
+  main{flex:1;padding:26px 40px 60px;min-width:0}
+  section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:26px 30px;margin-bottom:24px;box-shadow:0 1px 3px rgba(20,40,80,.05)}
+  h2{color:var(--blue);border-left:5px solid var(--accent);padding-left:12px;margin-top:4px;font-size:20px}
+  h3{color:var(--blue2);margin:22px 0 8px;font-size:16px}
+  p{margin:10px 0}
+  .muted{color:var(--gray);font-size:13px}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:#eef3fb;color:var(--blue);font-weight:600}
+  tr:nth-child(even) td{background:#fafcff}
+  code,.code{font-family:"Cascadia Code",Consolas,monospace;background:#eef1f6;padding:2px 6px;border-radius:5px;font-size:12.5px;color:#B1361E}
+  .codebox{background:#0f1626;color:#e6edf3;padding:14px 16px;border-radius:8px;font-family:Consolas,monospace;font-size:12.5px;white-space:pre;overflow:auto;line-height:1.6}
+  .tip,.warn,.ok{ border-radius:8px;padding:12px 16px;margin:14px 0;font-size:13.5px}
+  .tip{background:#eaf3ff;border-left:4px solid var(--blue2)}
+  .warn{background:#fff3e6;border-left:4px solid var(--orange)}
+  .ok{background:#eaf6ec;border-left:4px solid var(--green)}
+  .role-badge{display:inline-block;padding:2px 10px;border-radius:20px;color:#fff;font-size:12.5px;font-weight:600;margin-right:6px}
+  .b-admin{background:var(--accent)} .b-prod{background:var(--green)} .b-wh{background:var(--orange)}
+  figure{margin:18px 0;text-align:center}
+  figcaption{color:var(--gray);font-size:12.5px;margin-top:6px}
+  svg{max-width:100%;height:auto}
+  .pill{display:inline-block;background:#eef3fb;color:var(--blue2);border:1px solid var(--line);border-radius:6px;padding:2px 9px;font-size:12.5px;margin:2px}
+  .foot{text-align:center;color:var(--gray);font-size:12.5px;padding:20px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:880px){nav.toc{display:none}.wrap{display:block}main{padding:18px}.grid2{grid-template-columns:1fr}}
+  .pg{display:inline-block;background:#fff;border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:12px;color:var(--blue2);margin:2px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏭 四福车间管理系统 · 使用说明书</h1>
+  <div class="sub">按角色权限划分 · 图文并茂 · 版本 v1.0.2 · 程序设计：吴灵华</div>
+</header>
+
+<div class="wrap">
+<nav class="toc">
+  <a href="#c1">一、系统简介</a>
+  <a href="#c2">二、运行环境与访问</a>
+  <a href="#c3">三、角色与权限总览</a>
+  <a href="#c4">四、总览看板（首页）</a>
+  <a href="#c5">五、系统管理员指南</a>
+  <a href="#c6">六、生产车间指南</a>
+  <a href="#c7">七、仓库管理员指南</a>
+  <a href="#c8">八、各模块详解</a>
+  <a href="#c9">九、公共功能</a>
+  <a href="#c10">十、扫码操作</a>
+  <a href="#c11">十一、常见问题</a>
+</nav>
+
+<main>
+
+<!-- ========== 1. 系统简介 ========== -->
+<section id="c1">
+  <h2>一、系统简介</h2>
+  <p>本系统是一套 <b>车间数字化台账工具</b>，包含两大业务模块，全部运行在一个轻量服务中，无需安装数据库、无需联网：</p>
+  <div class="grid2">
+    <div>
+      <p><span class="pill">模块一 · 铜线出入库台账</span></p>
+      <ul>
+        <li><b>生产对比表</b>：生产车间登记每日各型号漆包线「BOM 重量 vs 实际重量」，自动算差重。</li>
+        <li><b>仓库铜线领用表</b>：仓库登记漆包线「领出 / 回库 / 线头报废 / 实际用量」。</li>
+      </ul>
+      <p>两张表相互独立——仓库记「实际领用」，生产记「单台用量对比」。</p>
+    </div>
+    <div>
+      <p><span class="pill">模块二 · 小型工具管理台账</span></p>
+      <ul>
+        <li>工具档案、借用归还（扫码）、维修报废、盘点、统计报表、工具领用。</li>
+        <li>看板含：库存排行、逾期未还、安全库存预警、保养到期提醒。</li>
+      </ul>
+    </div>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" font-family="Microsoft YaHei,sans-serif">
+      <defs>
+        <marker id="ar" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#5A6573"/></marker>
+        <linearGradient id="srv" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2E5496"/><stop offset="1" stop-color="#1F3864"/></linearGradient>
+      </defs>
+      <rect x="20" y="60" width="150" height="100" rx="10" fill="#EAF3FF" stroke="#2E5496"/>
+      <text x="95" y="95" text-anchor="middle" font-size="14" fill="#1F3864" font-weight="bold">电脑 / 手机</text>
+      <text x="95" y="118" text-anchor="middle" font-size="12" fill="#5A6573">浏览器访问</text>
+      <text x="95" y="138" text-anchor="middle" font-size="11" fill="#5A6573">http://IP:8090</text>
+
+      <line x1="170" y1="110" x2="250" y2="110" stroke="#5A6573" stroke-width="2" marker-end="url(#ar)"/>
+      <text x="210" y="100" text-anchor="middle" font-size="11" fill="#5A6573">HTTP</text>
+
+      <rect x="255" y="45" width="200" height="130" rx="12" fill="url(#srv)"/>
+      <text x="355" y="80" text-anchor="middle" font-size="15" fill="#fff" font-weight="bold">Node.js 服务</text>
+      <text x="355" y="103" text-anchor="middle" font-size="12" fill="#cfe0ff">端口 8090</text>
+      <text x="355" y="124" text-anchor="middle" font-size="11" fill="#cfe0ff">内置 http + node:sqlite</text>
+      <text x="355" y="144" text-anchor="middle" font-size="11" fill="#cfe0ff">零安装 · 单文件数据库</text>
+
+      <line x1="455" y1="110" x2="525" y2="110" stroke="#5A6573" stroke-width="2" marker-end="url(#ar)"/>
+
+      <rect x="530" y="60" width="160" height="100" rx="10" fill="#EAF6EC" stroke="#1E7B34"/>
+      <text x="610" y="95" text-anchor="middle" font-size="14" fill="#1E7B34" font-weight="bold">SQLite</text>
+      <text x="610" y="118" text-anchor="middle" font-size="12" fill="#5A6573">data.db</text>
+      <text x="610" y="138" text-anchor="middle" font-size="11" fill="#5A6573">全部数据存于此</text>
+
+      <text x="360" y="205" text-anchor="middle" font-size="12" fill="#5A6573">同一局域网内，多台设备同时访问，数据集中保存在服务器上的 data.db 单文件中</text>
+    </svg>
+    <figcaption>图 1　系统架构：浏览器 → Node.js 服务（8090）→ SQLite 数据库</figcaption>
+  </figure>
+</section>
+
+<!-- ========== 2. 运行环境与访问 ========== -->
+<section id="c2">
+  <h2>二、运行环境与访问</h2>
+  <table>
+    <tr><th>项目</th><th>说明</th></tr>
+    <tr><td>服务端运行时</td><td>Node.js ≥ 22（需 <code>--experimental-sqlite</code> 开关；Node 24 起已稳定）</td></tr>
+    <tr><td>数据库</td><td>SQLite 单文件 <code>data.db</code>（随程序目录，无需安装）</td></tr>
+    <tr><td>默认端口</td><td><code>8090</code>（可用环境变量 <code>PORT</code> 修改）</td></tr>
+    <tr><td>初始账号</td><td>用户名 <code>admin</code>　密码 <code>admin123</code>（首次登录后请立即在「用户管理」修改）</td></tr>
+    <tr><td>客户端</td><td>任意现代浏览器（Edge / Chrome / 手机浏览器均可）</td></tr>
+  </table>
+  <div class="ok"><b>访问方式</b>：服务器本机打开 <code>http://localhost:8090</code>；同一局域网内其他电脑/手机打开 <code>http://&lt;服务器IP&gt;:8090</code>。服务器 IP 可在服务器上执行 <code>ipconfig</code>（Windows）查看「IPv4 地址」。</div>
+</section>
+
+<!-- ========== 3. 角色与权限 ========== -->
+<section id="c3">
+  <h2>三、角色与权限总览</h2>
+  <p>系统设三种角色，权限为<b>前后端双重校验</b>：无权限的菜单不显示，直接输入网址会自动跳回首页，调用接口返回 <code>403</code> 拒绝。</p>
+
+  <figure>
+    <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" font-family="Microsoft YaHei,sans-serif">
+      <!-- 表头 -->
+      <rect x="170" y="20" width="160" height="40" rx="6" fill="#1F3864"/>
+      <text x="250" y="45" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">系统管理员</text>
+      <rect x="340" y="20" width="160" height="40" rx="6" fill="#1E7B34"/>
+      <text x="420" y="45" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">生产车间</text>
+      <rect x="510" y="20" width="170" height="40" rx="6" fill="#C55A11"/>
+      <text x="595" y="45" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">仓库管理员</text>
+
+      <!-- 行 -->
+      <g font-size="12.5" fill="#222">
+        <g transform="translate(0,80)">
+          <rect x="10" y="0" width="150" height="34" rx="5" fill="#eef3fb"/><text x="20" y="21" fill="#1F3864" font-weight="bold">总览看板</text>
+          <rect x="170" y="0" width="160" height="34" rx="5" fill="#EAF6EC"/><text x="250" y="22" text-anchor="middle" fill="#1E7B34" font-size="16">✔</text>
+          <rect x="340" y="0" width="160" height="34" rx="5" fill="#EAF6EC"/><text x="420" y="22" text-anchor="middle" fill="#1E7B34" font-size="16">✔</text>
+          <rect x="510" y="0" width="170" height="34" rx="5" fill="#EAF6EC"/><text x="595" y="22" text-anchor="middle" fill="#1E7B34" font-size="16">✔</text>
+        </g>
+        <g transform="translate(0,120)">
+          <rect x="10" y="0" width="150" height="34" rx="5" fill="#eef3fb"/><text x="20" y="21" fill="#1F3864" font-weight="bold">生产对比表</text>
+          <rect x="170" y="0" width="160" height="34" rx="5" fill="#EAF6EC"/><text x="250" y="22" text-anchor="middle" fill="#1E7B34" font-size="16">✔</text>
+          <rect x="340" y="0" width="160" height="34" rx="5" fill="#EAF6EC"/><text x="420" y="22" text-anchor="middle" fill="#1E7B34" font-size="16">✔</text>
+          <rect x="510" y="0" width="170" height="34" rx="5" fill="#FBEAEA"/><text x="595" y="22" text-anchor="middle" fill="#C00000" font-size="16">✘</text>
+        </g>
+        <g transform="translate(0,160)">
+          <rect x="10" y="0" width="150" height="34" rx="5" fill="#eef3fb"/><text x="20" y="21" fill="#1F3864" font-weight="bold">仓库铜线领用表</text>
+          <rect x="170" y="0" width="160" height="34" rx="5" fill="#EAF6EC"/><text x="250" y="22" text-anchor="middle" fill="#1E7B34" font-size="16">✔</text>
+          <rect x="340" y="0" width="160" height="34" rx="5" fill="#FBEAEA"/><text x="420" y="22" text-anchor="middle" fill="#C00000" font-size="16">✘</text>
+          <rect x="510" y="0" width="170" height="34" rx="5" fill="#EAF6EC"/><text x="595" y="22" text-anchor="middle" fill="#1E7B34" font-size="16">✔</text>
+        </g>
+        <g transform="translate(0,200)">
+          <rect x="10" y="0" width="150" height="34" rx="5" fill="#eef3fb"/><text x="20" y="21" fill="#1F3864" font-weight="bold">工具台账（档案/借还/维修/盘点/报表/领用）</text>
+          <rect x="170" y="0" width="160" height="34" rx="5" fill="#EAF6EC"/><text x="250" y="22" text-anchor="middle" fill="#1E7B34" font-size="16">✔</text>
+          <rect x="340" y="0" width="160" height="34" rx="5" fill="#FBEAEA"/><text x="420" y="22" text-anchor="middle" fill="#C00000" font-size="16">✘</text>
+          <rect x="510" y="0" width="170" height="34" rx="5" fill="#EAF6EC"/><text x="595" y="22" text-anchor="middle" fill="#1E7B34" font-size="16">✔</text>
+        </g>
+        <g transform="translate(0,240)">
+          <rect x="10" y="0" width="150" height="34" rx="5" fill="#eef3fb"/><text x="20" y="21" fill="#1F3864" font-weight="bold">用户管理 / 备份</text>
+          <rect x="170" y="0" width="160" height="34" rx="5" fill="#EAF6EC"/><text x="250" y="22" text-anchor="middle" fill="#1E7B34" font-size="16">✔</text>
+          <rect x="340" y="0" width="160" height="34" rx="5" fill="#FBEAEA"/><text x="420" y="22" text-anchor="middle" fill="#C00000" font-size="16">✘</text>
+          <rect x="510" y="0" width="170" height="34" rx="5" fill="#FBEAEA"/><text x="595" y="22" text-anchor="middle" fill="#C00000" font-size="16">✘</text>
+        </g>
+      </g>
+    </svg>
+    <figcaption>图 2　角色 × 模块 权限矩阵（✔ 可见　✘ 不可见）</figcaption>
+  </figure>
+
+  <table>
+    <tr><th>角色</th><th>可见菜单</th><th>典型使用者</th></tr>
+    <tr><td><span class="role-badge b-admin">系统管理员</span></td><td>全部页面 + 用户管理 + 数据备份与恢复</td><td>车间主管 / IT 负责人</td></tr>
+    <tr><td><span class="role-badge b-prod">生产车间</span></td><td>总览看板、生产对比表</td><td>生产录单员</td></tr>
+    <tr><td><span class="role-badge b-wh">仓库管理员</span></td><td>总览看板、仓库铜线领用表、工具台账全部（档案/借还/维修/盘点/报表/领用）</td><td>仓管员 / 工具管理员</td></tr>
+  </table>
+</section>
+
+<!-- ========== 4. 总览看板 ========== -->
+<section id="c4">
+  <h2>四、总览看板（首页）</h2>
+  <p>登录后默认进入「总览看板」。首页按角色<b>只显示你有权限的卡片</b>，避免无关信息干扰。</p>
+  <table>
+    <tr><th>卡片</th><th>可见角色</th><th>内容</th></tr>
+    <tr><td>工具库存看板 + 4 个排行</td><td>仓库管理员 / 管理员</td><td>在册/在库/借出/维修/报废统计；库存最多前三、库存&lt;3 前三、领用最多人员前三、报废最多人员前三</td></tr>
+    <tr><td>最近工具领用（前5条）</td><td>仓库管理员 / 管理员</td><td>最新领用记录流水</td></tr>
+    <tr><td>今日铜线台账速览</td><td>有铜线模块权限者</td><td>生产侧：今日任务单/记录/实际重量/需改 BOM；仓库侧：今日领出/回库/线头报废</td></tr>
+    <tr><td>每日任务单数量统计</td><td>生产车间 / 管理员</td><td>近 14 天任务单趋势、超差提示</td></tr>
+    <tr><td>逾期未还 / 安全库存预警 / 保养到期</td><td>仓库管理员 / 管理员</td><td>工具相关预警提醒</td></tr>
+    <tr><td>快捷入口 + 备份数据库</td><td>快捷入口全员；备份仅管理员</td><td>一键跳转到各模块；管理员可下载备份</td></tr>
+  </table>
+</section>
+
+<!-- ========== 5. 管理员 ========== -->
+<section id="c5">
+  <h2>五、系统管理员指南</h2>
+  <p><span class="role-badge b-admin">系统管理员</span>拥有全部功能，额外负责<b>账号与数据</b>管理。</p>
+  <h3>5.1 用户管理（用户管理菜单）</h3>
+  <ol>
+    <li>「新增用户」：填写用户名、姓名、密码，选择<b>角色</b>（admin / production / warehouse）与<b>部门/班组</b>。</li>
+    <li>「编辑」：修改姓名、角色、部门；<b>修改密码需由用户在登录后自行修改，或管理员重置</b>。</li>
+    <li>角色决定该账号能看到哪些菜单（见第三章），请按岗位准确分配。</li>
+  </ol>
+  <div class="tip">建议至少配置两名管理员账号，避免唯一管理员密码遗忘导致无法登录。</div>
+  <h3>5.2 数据库备份与恢复</h3>
+  <ul>
+    <li><b>自动备份</b>：系统每天 <b>15:00</b> 自动把数据库备份到程序目录 <code>backups/</code> 文件夹（文件名 <code>auto-YYYYMMDD-HHMMSS.db</code>），自动保留最近 <b>30</b> 份，无需人工干预。</li>
+    <li><b>手动备份</b>：首页点「💾 备份数据库」（仅管理员可见）下载 <code>backup-日期.db</code>；或在「用户管理 → 数据备份与恢复」点「下载当前备份」。</li>
+    <li><b>恢复（图形化）</b>：进入「用户管理 → 数据备份与恢复」：
+      <ol>
+        <li>「选择备份文件恢复」：从本机选取一个 <code>.db</code> 备份文件即可一键恢复；</li>
+        <li>下方「自动备份列表」对每个备份提供<b>下载 / 恢复 / 删除</b>按钮，可一键从中恢复。</li>
+      </ol>
+      恢复前系统会<b>先自动备份当前数据</b>（存为 <code>pre-restore-时间戳.db</code>），万一恢复有误可再次用该文件回退。</li>
+    <li><b>恢复（手工）</b>：把备份文件改名为 <code>data.db</code>（同时覆盖 <code>data.db-wal / data.db-shm</code>）覆盖程序目录下的同名文件，重启服务即可（部署时若使用了 <code>DATA_DIR</code>，则覆盖该目录下的 data.db）。</li>
+  </ul>
+  <h3>5.3 版本信息</h3>
+  <p>页脚与导航栏显示当前版本（v1.0.2）。版本号由更新日志自动计算；如需发布新版本，可在「版本」接口叠加说明。</p>
+</section>
+
+<!-- ========== 6. 生产车间 ========== -->
+<section id="c6">
+  <h2>六、生产车间指南</h2>
+  <p><span class="role-badge b-prod">生产车间</span>只能看到「总览看板」与「生产对比表」。</p>
+  <h3>6.1 录入生产对比表</h3>
+  <ol>
+    <li>打开「生产对比表」，点「新增」或直接在录入区填写。</li>
+    <li>顶部填：<b>日期、生产任务单号、BOM 号</b>。</li>
+    <li>明细行填：<b>铜线规格型号、类型（单相/三相/永磁，可不选）、主线线模、副线线模、BOM 重量(kg)、实际重量(kg)</b>，系统自动算 <b>差重 = BOM − 实际</b>。</li>
+    <li>一个任务单可点「+ 增行」录<b>多种线径规格</b>；点行尾 ✕ 删行。</li>
+    <li>保存后可在下方列表查看、编辑、删除；支持按日期/任务单/规格筛选。</li>
+  </ol>
+  <div class="warn">「实际重量」列可手填（空值会显示「实际重量」提示文字，米黄底色表示可编辑）。差重由系统自动计算，无需手填。</div>
+  <h3>6.2 汇总与对比</h3>
+  <p>「按 BOM 号汇总」：同 BOM + 同任务单内不同线径先<b>合计</b>，同 BOM 跨任务单再取<b>平均值</b>，用于判断是否需要修改 BOM（超差阈值 10g）。</p>
+</section>
+
+<!-- ========== 7. 仓库管理员 ========== -->
+<section id="c7">
+  <h2>七、仓库管理员指南</h2>
+  <p><span class="role-badge b-wh">仓库管理员</span>负责铜线领用与全部工具台账。</p>
+  <h3>7.1 仓库铜线领用表</h3>
+  <ol>
+    <li>打开「仓库铜线领用表」，填写：<b>日期、生产任务单号、线径规格、领出重量(kg)、回库重量(kg)、线头报废重量(kg)</b>。</li>
+    <li>系统自动算 <b>实际用量 = 领出 − 回库 − 线头报废</b>。</li>
+    <li>一个任务单可点「+ 增行」录入<b>多种线径规格</b>。</li>
+    <li>保存、查询、编辑、删除、打印、导出 Excel 均支持。</li>
+  </ol>
+  <div class="ok">此表只记录<b>仓库实际领用</b>，与生产对比表的「单台用量对比」相互独立，不记录 BOM 差重。</div>
+  <h3>7.2 工具台账（档案 / 借还 / 维修 / 盘点 / 报表 / 领用）</h3>
+  <ul>
+    <li><b>工具档案</b>：每件工具建卡（自动编号、序列号、品牌型号、位置、采购、照片、安全库存、保养周期），支持批量打印二维码标签。</li>
+    <li><b>借用归还</b>：扫码枪/手工输入编号，自动识别借或还；归还检查状态，损坏自动转维修。</li>
+    <li><b>维修报废</b>：维修保养登记（费用/原因）后回库；报废登记（原因+批准人）移出在册。</li>
+    <li><b>盘点</b>：一键生成盘点单，扫码清点，结束自动出盘盈盘亏报告。</li>
+    <li><b>统计报表</b>：个人未还清单、周转率/使用率、维修报废统计。</li>
+    <li><b>工具领用</b>：登记新领 / 报废换新 / 维修调换，含领用人、班组、日期、用途。</li>
+  </ul>
+</section>
+
+<!-- ========== 8. 模块详解 ========== -->
+<section id="c8">
+  <h2>八、各模块详解（字段速查）</h2>
+
+  <h3>8.1 生产对比表</h3>
+  <table>
+    <tr><th>字段</th><th>说明</th><th>是否自动</th></tr>
+    <tr><td>日期 / 生产任务单号 / BOM 号</td><td>表头级信息，单次录入</td><td>手填</td></tr>
+    <tr><td>铜线规格型号</td><td>下拉选择或手输，支持过滤</td><td>手填</td></tr>
+    <tr><td>类型</td><td>单相 / 三相 / 永磁（可不选，影响主线/副线线模列显示）</td><td>手填</td></tr>
+    <tr><td>主线线模 / 副线线模</td><td>线模尺寸</td><td>手填</td></tr>
+    <tr><td>BOM 重量(kg) / 实际重量(kg)</td><td>单台理论值与实际值</td><td>手填</td></tr>
+    <tr><td>差重(kg)</td><td>= BOM − 实际；正红负绿</td><td><b>自动</b></td></tr>
+    <tr><td>备注</td><td>补充说明</td><td>手填</td></tr>
+  </table>
+
+  <h3>8.2 仓库铜线领用表</h3>
+  <table>
+    <tr><th>字段</th><th>说明</th><th>是否自动</th></tr>
+    <tr><td>日期 / 生产任务单号 / 线径规格</td><td>领用记录头</td><td>手填</td></tr>
+    <tr><td>领出重量 / 回库重量 / 线头报废(kg)</td><td>实际收发存</td><td>手填</td></tr>
+    <tr><td>实际用量(kg)</td><td>= 领出 − 回库 − 线头报废</td><td><b>自动</b></td></tr>
+    <tr><td>备注</td><td>补充说明</td><td>手填</td></tr>
+  </table>
+
+  <h3>8.3 工具领用表</h3>
+  <table>
+    <tr><th>字段</th><th>说明</th></tr>
+    <tr><td>领用日期 / 工具编号 / 工具名称</td><td>领用记录头</td></tr>
+    <tr><td>领用人 / 班组 / 部门</td><td>责任人信息</td></tr>
+    <tr><td>领用类型</td><td><span class="pill" style="background:#EAF6EC;color:#1E7B34">新领</span> <span class="pill" style="background:#FBEAEA;color:#C00000">报废换新</span> <span class="pill" style="background:#EAF3FF;color:#2E5496">维修调换</span></td></tr>
+    <tr><td>数量 / 用途 / 备注</td><td>明细</td></tr>
+  </table>
+</section>
+
+<!-- ========== 9. 公共功能 ========== -->
+<section id="c9">
+  <h2>九、公共功能（所有角色通用）</h2>
+  <h3>9.1 查询与筛选</h3>
+  <p>各表上方均有「日期范围 / 单号 / 规格」等筛选条件，点「查询」即按条件过滤；「重置」恢复全部。</p>
+  <h3>9.2 打印（含签字栏）</h3>
+  <p>点「打印」调用浏览器打印，页面自动带标题、导出人、打印时间；生产/仓库表含<b>仓库管理员 / 复核 / 主管</b>签字栏。建议打印前在浏览器打印设置中选择「横向」并勾选「背景图形」。</p>
+  <h3>9.3 导出 Excel</h3>
+  <p>点「导出 Excel」下载带样式的 .xlsx：标题居中、表头底色、合计行、签字栏一应俱全，可直接用于归档或上报。</p>
+  <h3>9.4 修改密码</h3>
+  <p>管理员在「用户管理」重置他人密码；个人可在登录后通过管理功能修改自己的密码（具体以用户管理页为准）。</p>
+</section>
+
+<!-- ========== 10. 扫码 ========== -->
+<section id="c10">
+  <h2>十、扫码操作说明</h2>
+  <ul>
+    <li><b>扫码枪（推荐，即插即用）</b>：光标点在「工具编号」输入框，扫工具上的二维码标签即可，无需任何设置。</li>
+    <li><b>二维码标签</b>：在「工具档案」勾选工具 → 点「打印二维码标签」，用普通打印机或标签机打印后贴在工具上。</li>
+    <li><b>手机操作</b>：同一局域网内用手机浏览器打开系统，可手工输入编号完成借还/领用。</li>
+  </ul>
+</section>
+
+<!-- ========== 11. FAQ ========== -->
+<section id="c11">
+  <h2>十一、常见问题（FAQ）</h2>
+  <table>
+    <tr><th>问题</th><th>处理</th></tr>
+    <tr><td>打不开页面</td><td>确认服务器已启动；检查防火墙是否放行 8090 端口；手机/其他电脑用服务器 IP 访问而非 localhost。</td></tr>
+    <tr><td>端口被占用</td><td>修改启动命令加 <code>set PORT=9000</code>，或 Docker 改端口映射左边值。</td></tr>
+    <tr><td>忘记管理员密码</td><td>用另一管理员账号重置；或直接覆盖 data.db 恢复备份（会丢失备份后新数据，慎用）。</td></tr>
+    <tr><td>页面显示异常</td><td>浏览器按 <code>Ctrl+F5</code> 强制刷新，清除缓存。</td></tr>
+    <tr><td>换了角色后菜单没变</td><td>重新登录（退出后再登录），权限在登录时加载。</td></tr>
+  </table>
+  <div class="foot">四福车间管理系统 v1.0.2 · 程序设计：吴灵华 · 本说明书配套「部署到 Windows Server」「部署到绿联 4600 NAS」两份部署文档</div>
+</section>
+
+</main>
+</div>
+</body>
+</html>

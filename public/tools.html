@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工具基础档案</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.photo-thumb { width: 46px; height: 46px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; }
+#labelArea { display: none; }
+@media print {
+  body.label-print .container, body.label-print .topbar { display: none !important; }
+  body.label-print #labelArea { display: flex !important; flex-wrap: wrap; gap: 6mm; padding: 6mm; }
+  .label-card { border: 1px solid #000; border-radius: 2mm; padding: 3mm; width: 58mm; text-align: center; page-break-inside: avoid; }
+  .label-card .qr { display: flex; justify-content: center; margin: 2mm 0; }
+  .label-card .code { font-size: 13px; font-weight: 700; }
+  .label-card .nm { font-size: 11px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <div class="toolbar no-print">
+      <div class="form-item"><label>关键字</label><input id="q_kw" placeholder="编号/名称/型号/品牌/序列号"></div>
+      <div class="form-item"><label>类别</label><select id="q_cat"><option value="">全部类别</option></select></div>
+      <div class="form-item"><label>状态</label>
+        <select id="q_status"><option value="">全部状态</option>
+          <option>在库</option><option>借出</option><option>维修中</option><option>已报废</option></select></div>
+      <button class="btn" onclick="load()">🔍 查询</button>
+      <span class="spacer"></span>
+      <button class="btn green need-write" onclick="openAdd()">＋ 新增工具</button>
+      <button class="btn ghost need-write" onclick="printLabels()">🏷️ 打印二维码标签</button>
+      <button class="btn ghost admin-only" onclick="doExport()">📤 导出Excel</button>
+      <button class="btn orange admin-only" id="toolTplBtn" onclick="dlToolTemplate()">📥 下载导入模板</button>
+      <label class="btn admin-only" id="toolImpBtn" style="cursor:pointer">📤 导入Excel
+        <input id="toolImpFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="importTools()">
+      </label>
+      <button class="btn ghost" onclick="App.print('工具基础档案台账','')">🖨️ 打印</button>
+    </div>
+    <div class="print-header"></div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>
+          <th class="no-print"><input type="checkbox" id="chkAll" onclick="$$('.rowchk').forEach(c=>c.checked=this.checked)"></th>
+          <th>照片</th><th>工具编号</th><th>名称</th><th>型号/规格</th><th>品牌</th><th>类别</th><th>序列号</th>
+          <th>存放位置</th><th>数量</th><th>采购日期</th><th>供应商</th><th>单价(元)</th><th>所属部门</th><th>状态</th>
+          <th class="actions-col need-write">操作</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 新增/编辑弹窗 -->
+<div class="modal-mask" id="mask" style="display:none">
+  <div class="modal">
+    <h3 id="mTitle">新增工具</h3>
+    <div class="form-row">
+      <div class="form-item"><label><b>*</b> 类别</label>
+        <select id="m_cat" onchange="genCode()">
+          <option value="DZ">电动工具(DZ)</option><option value="SD">手动工具(SD)</option>
+          <option value="LJ">量具(LJ)</option><option value="DJ">刀具(DJ)</option>
+          <option value="YH">易耗品(YH)</option><option value="QT">其他(QT)</option>
+        </select></div>
+      <div class="form-item"><label><b>*</b> 工具编号(自动生成)</label><input id="m_code"></div>
+      <div class="form-item"><label><b>*</b> 工具名称</label><input id="m_name" placeholder="如 数显卡尺"></div>
+      <div class="form-item"><label>型号/规格</label><input id="m_model" placeholder="如 0-150mm"></div>
+      <div class="form-item"><label>品牌</label><input id="m_brand"></div>
+      <div class="form-item"><label>序列号/机身号</label><input id="m_serial"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-item"><label>存放位置</label><input id="m_loc" placeholder="如 A架-2层-3号箱"></div>
+      <div class="form-item"><label>采购日期</label><input type="date" id="m_pdate"></div>
+      <div class="form-item"><label>保质期/使用寿命</label><input id="m_life" placeholder="如 2年 / 5000次"></div>
+      <div class="form-item"><label>供应商</label><input id="m_sup"></div>
+      <div class="form-item"><label>单价(元)</label><input type="number" step="0.01" min="0" id="m_price"></div>
+      <div class="form-item"><label>资产所属部门</label><input id="m_dept"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-item"><label>数量(易耗品可>1)</label><input type="number" min="1" id="m_qty" value="1"></div>
+      <div class="form-item"><label>安全库存线(0=不预警)</label><input type="number" min="0" id="m_min" value="0"></div>
+      <div class="form-item"><label>保养周期(天,0=不保养)</label><input type="number" min="0" id="m_cycle" value="0"></div>
+      <div class="form-item"><label>上次保养日期</label><input type="date" id="m_lastm"></div>
+      <div class="form-item"><label>实物照片</label><input type="file" accept="image/*" id="m_photo"></div>
+    </div>
+    <div class="form-row"><div class="form-item" style="flex:1"><label>备注</label><input id="m_remark" style="width:100%"></div></div>
+    <div id="photoPreview" style="margin-bottom:8px"></div>
+    <div class="actions">
+      <button class="btn ghost" onclick="$('#mask').style.display='none'">取消</button>
+      <button class="btn" onclick="save()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 二维码标签打印区 -->
+<div id="labelArea"></div>
+
+<script src="js/vendor/xlsx.full.min.js"></script>
+<script src="js/vendor/qrcode.min.js"></script>
+<script src="js/app.js"></script>
+<script src="js/pair-ac.js"></script>
+<script>
+App.nav('tools.html');
+const CATS = { DZ: '电动工具', SD: '手动工具', LJ: '量具', DJ: '刀具', YH: '易耗品', QT: '其他' };
+let rows = [], editId = null, photoData = '';
+
+// 工具档案新增/编辑弹窗的「编号 ↔ 名称」双向联动模糊选择
+let toolItems = [];
+async function loadTools() {
+  try {
+    const arr = await App.get('/api/tools?limit=2000');
+    const list = (arr || [])
+      .map(t => ({ code: t.code || '', name: t.name || '' }))
+      .filter(t => t.code || t.name);
+    toolItems.length = 0; toolItems.push(...list);   // 原地修改，保持 PairAC 引用有效
+    if (!$('#m_code')._pairAC) PairAC.init($('#m_code'), $('#m_name'), toolItems);
+    else PairAC.setItems($('#m_code'), $('#m_name'), toolItems);
+  } catch (e) { console.warn('工具列表加载失败', e); }
+}
+loadTools();
+
+// 类别下拉
+$('#q_cat').innerHTML += Object.values(CATS).map(c => `<option>${c}</option>`).join('');
+
+async function load() {
+  const p = new URLSearchParams();
+  if ($('#q_kw').value.trim()) p.set('kw', $('#q_kw').value.trim());
+  if ($('#q_cat').value) p.set('category', $('#q_cat').value);
+  if ($('#q_status').value) p.set('status', $('#q_status').value);
+  rows = await App.get('/api/tools?' + p);
+  const e = App.escapeHtml;
+  const tagCls = { '在库': 'in', '借出': 'out', '维修中': 'fix', '已报废': 'dead' };
+  $('#tbody').innerHTML = rows.length ? rows.map(r => `<tr>
+    <td class="no-print"><input type="checkbox" class="rowchk" value="${r.id}"></td>
+    <td>${r.photo ? `<img class="photo-thumb" src="${r.photo}" onclick="viewPhoto(${r.id})" title="点击查看大图">` : '—'}</td>
+    <td><b>${e(r.code)}</b></td><td>${e(r.name)}</td><td>${e(r.model)}</td><td>${e(r.brand)}</td>
+    <td>${e(r.category)}</td><td>${e(r.serial_no)}</td><td>${e(r.location)}</td>
+    <td>${r.qty}${r.min_stock > 0 && r.qty <= r.min_stock ? ' <span class="tag fix">缺</span>' : ''}</td>
+    <td>${e(r.purchase_date)}</td><td>${e(r.supplier)}</td><td class="num">${App.fmt(r.price)}</td><td>${e(r.dept)}</td>
+    <td><span class="tag ${tagCls[r.status] || 'blue'}">${r.status}</span></td>
+    <td class="actions-col need-write">
+      <button class="btn sm ghost" onclick="openEdit(${r.id})">编辑</button>
+      ${App.isAdmin() ? `<button class="btn sm red" onclick="delRow(${r.id})">删除</button>` : ''}
+    </td></tr>`).join('')
+    : '<tr><td colspan="16" class="empty-tip">暂无工具，点击右上角「新增工具」建立档案</td></tr>';
+}
+function viewPhoto(id) {
+  const r = rows.find(x => x.id === id); if (!r || !r.photo) return;
+  const w = window.open('');
+  w.document.write('<title>' + r.code + '</title><img src="' + r.photo + '" style="max-width:100%">');
+}
+
+async function genCode() {
+  $('#m_code').value = await App.get('/api/tools/next-code?prefix=' + $('#m_cat').value);
+}
+function openAdd() {
+  editId = null; photoData = '';
+  $('#mTitle').textContent = '新增工具（每件工具一张"身份证"）';
+  ['m_name', 'm_model', 'm_brand', 'm_serial', 'm_loc', 'm_pdate', 'm_life', 'm_sup', 'm_price', 'm_dept', 'm_lastm', 'm_remark']
+    .forEach(i => $('#' + i).value = '');
+  $('#m_qty').value = 1; $('#m_min').value = 0; $('#m_cycle').value = 0;
+  $('#m_photo').value = ''; $('#photoPreview').innerHTML = '';
+  $('#m_cat').disabled = false; $('#m_code').readOnly = false;
+  genCode();
+  $('#mask').style.display = 'flex';
+}
+function openEdit(id) {
+  const r = rows.find(x => x.id === id); if (!r) return;
+  editId = id; photoData = r.photo || '';
+  $('#mTitle').textContent = '编辑工具 ' + r.code;
+  const codeKey = Object.keys(CATS).find(k => CATS[k] === r.category);
+  if (codeKey) $('#m_cat').value = codeKey;
+  $('#m_cat').disabled = true;
+  $('#m_code').value = r.code; $('#m_code').readOnly = true;
+  $('#m_name').value = r.name; $('#m_model').value = r.model; $('#m_brand').value = r.brand;
+  $('#m_serial').value = r.serial_no; $('#m_loc').value = r.location; $('#m_pdate').value = r.purchase_date;
+  $('#m_life').value = r.life_span; $('#m_sup').value = r.supplier; $('#m_price').value = r.price;
+  $('#m_dept').value = r.dept; $('#m_qty').value = r.qty; $('#m_min').value = r.min_stock;
+  $('#m_cycle').value = r.maint_cycle; $('#m_lastm').value = r.last_maint; $('#m_remark').value = r.remark;
+  $('#m_photo').value = '';
+  $('#photoPreview').innerHTML = r.photo ? `<img src="${r.photo}" style="max-height:110px;border-radius:8px">` : '';
+  $('#mask').style.display = 'flex';
+}
+$('#m_photo').addEventListener('change', function () {
+  const f = this.files[0]; if (!f) return;
+  // 压缩到最长边 640px
+  const img = new Image();
+  img.onload = () => {
+    const cv = document.createElement('canvas');
+    const scale = Math.min(1, 640 / Math.max(img.width, img.height));
+    cv.width = img.width * scale; cv.height = img.height * scale;
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    photoData = cv.toDataURL('image/jpeg', 0.75);
+    $('#photoPreview').innerHTML = `<img src="${photoData}" style="max-height:110px;border-radius:8px">`;
+  };
+  img.src = URL.createObjectURL(f);
+});
+async function save() {
+  const body = {
+    code: $('#m_code').value.trim(), name: $('#m_name').value.trim(),
+    category: CATS[$('#m_cat').value], model: $('#m_model').value, brand: $('#m_brand').value,
+    serial_no: $('#m_serial').value, location: $('#m_loc').value, purchase_date: $('#m_pdate').value,
+    life_span: $('#m_life').value, supplier: $('#m_sup').value, price: $('#m_price').value,
+    dept: $('#m_dept').value, qty: $('#m_qty').value, min_stock: $('#m_min').value,
+    maint_cycle: $('#m_cycle').value, last_maint: $('#m_lastm').value,
+    remark: $('#m_remark').value, photo: photoData
+  };
+  if (!body.code || !body.name) return App.toast('编号和名称必填', 'err');
+  if (editId) await App.put('/api/tools/' + editId, body);
+  else await App.post('/api/tools', body);
+  $('#mask').style.display = 'none';
+  App.toast('保存成功', 'ok'); load();
+}
+async function delRow(id) {
+  if (!confirm('删除工具将同时失去其档案信息（借还历史保留），确定？')) return;
+  await App.del('/api/tools/' + id); App.toast('已删除', 'ok'); load();
+}
+
+/* 二维码标签打印 */
+function printLabels() {
+  const ids = $$('.rowchk:checked').map(c => +c.value);
+  const list = ids.length ? rows.filter(r => ids.includes(r.id)) : rows;
+  if (!list.length) return App.toast('没有可打印的工具', 'err');
+  const area = $('#labelArea');
+  area.innerHTML = '';
+  for (const r of list) {
+    const card = document.createElement('div');
+    card.className = 'label-card';
+    card.innerHTML = `<div class="code">${App.escapeHtml(r.code)}</div><div class="qr"></div>
+      <div class="nm">${App.escapeHtml(r.name)} ${App.escapeHtml(r.model)}</div>
+      <div class="nm">位置：${App.escapeHtml(r.location || '-')}</div>`;
+    area.appendChild(card);
+    new QRCode(card.querySelector('.qr'), { text: r.code, width: 90, height: 90, correctLevel: QRCode.CorrectLevel.M });
+  }
+  document.body.classList.add('label-print');
+  setTimeout(() => { window.print(); document.body.classList.remove('label-print'); }, 300);
+}
+
+function doExport() {
+  if (!rows.length) return App.toast('没有可导出的数据', 'err');
+  App.exportExcel('工具基础档案台账',
+    ['工具编号', '名称', '型号/规格', '品牌', '类别', '序列号', '存放位置', '数量', '安全库存', '采购日期', '保质期/寿命', '供应商', '单价(元)', '所属部门', '保养周期(天)', '上次保养', '状态', '备注'],
+    rows.map(r => [r.code, r.name, r.model, r.brand, r.category, r.serial_no, r.location, r.qty, r.min_stock,
+      r.purchase_date, r.life_span, r.supplier, r.price, r.dept, r.maint_cycle, r.last_maint, r.status, r.remark]),
+    '工具档案');
+}
+load();
+
+/* 管理员导入 / 导出模板（无缝导入：按导出模板填写后即可导入）*/
+if (!App.isAdmin()) {
+  ['toolTplBtn', 'toolImpBtn'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+}
+function dlToolTemplate() {
+  const headers = ['工具编号', '名称', '类别', '型号/规格', '品牌', '序列号/机身号', '存放位置', '数量',
+    '安全库存线', '采购日期', '保质期/使用寿命', '供应商', '单价(元)', '所属部门', '保养周期(天)', '上次保养', '备注'];
+  const ex = [headers, ['DZ-001', '示例工具', '电动工具', '0-150', '示例品牌', 'SN123', 'A架1', 1,
+    0, '2026-01-01', '2年', '示例供应商', 100, '生产一组', 90, '', '导入前请删除此示例行']];
+  const ws = XLSX.utils.aoa_to_sheet(ex);
+  ws['!cols'] = headers.map(h => ({ wch: Math.max(10, String(h).length * 2) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '工具导入');
+  XLSX.writeFile(wb, '工具档案导入模板.xlsx');
+  App.toast('模板已下载', 'ok');
+}
+async function importTools() {
+  const inp = $('#toolImpFile'); if (!inp.files.length) return;
+  const f = inp.files[0];
+  const buf = await f.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const arr = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+  const rows = arr.map(o => {
+    const ks = Object.keys(o);
+    return {
+      code: String(o[ks[0]] || '').trim(), name: String(o[ks[1]] || '').trim(), category: String(o[ks[2]] || '').trim(),
+      model: String(o[ks[3]] || '').trim(), brand: String(o[ks[4]] || '').trim(), serial_no: String(o[ks[5]] || '').trim(),
+      location: String(o[ks[6]] || '').trim(), qty: o[ks[7]], min_stock: o[ks[8]], purchase_date: String(o[ks[9]] || '').trim(),
+      life_span: String(o[ks[10]] || '').trim(), supplier: String(o[ks[11]] || '').trim(), price: o[ks[12]],
+      dept: String(o[ks[13]] || '').trim(), maint_cycle: o[ks[14]], last_maint: String(o[ks[15]] || '').trim(), remark: String(o[ks[16]] || '').trim()
+    };
+  }).filter(r => r.code && r.name && !/示例/.test(r.code) && !/工具编号/.test(r.code));
+  if (!rows.length) return App.toast('模板中没有可导入的数据行', 'err');
+  const r = await App.post('/api/tools/import', { rows });
+  inp.value = '';
+  App.toast('已导入：新增 ' + (r.created || 0) + ' 条，更新 ' + (r.updated || 0) + ' 条', 'ok');
+  load();
+}
+
+</script>
+</body>
+</html>

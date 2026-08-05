@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>统计报表</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.tabs button { border: 1px solid var(--border); background: #fff; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+.tabs button.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <div class="tabs no-print">
+      <button class="on" data-t="personal" onclick="switchTab(this)">个人未还工具清单</button>
+      <button data-t="usage" onclick="switchTab(this)">工具周转率/使用率</button>
+      <button data-t="repair" onclick="switchTab(this)">维修/报废统计</button>
+      <button data-t="copperDraw" onclick="switchTab(this)">铜线最高领用量</button>
+      <button data-t="copperStock" onclick="switchTab(this)">铜线库存量</button>
+    </div>
+    <div class="toolbar no-print">
+      <span id="tabDesc" style="color:var(--muted)"></span>
+      <span class="spacer"></span>
+      <button class="btn ghost" onclick="doExport()">📤 导出Excel</button>
+      <button class="btn ghost" onclick="doPrint()">🖨️ 打印</button>
+    </div>
+    <div class="print-header"></div>
+    <div class="table-wrap">
+      <table class="data"><thead id="thead"></thead><tbody id="tbody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script src="js/vendor/xlsx.full.min.js"></script>
+<script src="js/app.js"></script>
+<script>
+App.nav('reports.html');
+let tab = 'personal', data = [];
+const CONF = {
+  personal: {
+    title: '个人未还工具清单', desc: '显示每位员工名下所有未归还的工具',
+    headers: ['借用人', '班组/部门', '未还件数', '未还工具明细'],
+    map: r => [r.borrower, r.borrower_dept, r.cnt, r.tools_list],
+    url: '/api/stats/personal'
+  },
+  usage: {
+    title: '工具周转率 / 使用率分析', desc: '按历史借用次数排序，识别高频与闲置工具',
+    headers: ['工具编号', '名称', '类别', '当前状态', '累计借用次数', '最近借用时间'],
+    map: r => [r.code, r.name, r.category, r.status, r.borrow_cnt, r.last_borrow],
+    url: '/api/stats/usage'
+  },
+  repair: {
+    title: '维修 / 报废统计', desc: '分析工具损坏率与维修成本，为采购提供参考',
+    headers: ['工具编号', '名称', '类别', '维修次数', '累计维修费用(元)', '当前状态'],
+    map: r => [r.code, r.name, r.category, r.repair_cnt, r.total_cost, r.status],
+    url: '/api/stats/repair'
+  },
+  copperDraw: {
+    title: '铜线最高领用量统计', desc: '按规格汇总领出重量，识别用量最大的铜线',
+    headers: ['铜线规格型号', '领用次数', '领出重量(kg)', '回库重量(kg)', '报废线头(kg)', '实际用量(kg)'],
+    map: r => [r.wire_spec, r.c, +r.out_w, +r.ret_w, +r.scrap_w, +r.used_w],
+    url: '/api/stats/copper-draw'
+  },
+  copperStock: {
+    title: '铜线库存量统计', desc: '当前各规格铜线库存量（与「铜线库存」模块一致）',
+    headers: ['铜线规格型号', '库存量', '单位', '备注', '更新时间'],
+    map: r => [r.spec, +r.stock, r.unit, r.remark, r.updated_at],
+    url: '/api/stats/copper-stock'
+  }
+};
+function switchTab(btn) {
+  $$('.tabs button').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  tab = btn.dataset.t; load();
+}
+async function load() {
+  const c = CONF[tab];
+  $('#tabDesc').textContent = c.desc;
+  data = await App.get(c.url);
+  $('#thead').innerHTML = '<tr>' + ['序号', ...c.headers].map(h => `<th>${h}</th>`).join('') + '</tr>';
+  const e = App.escapeHtml;
+  $('#tbody').innerHTML = data.length
+    ? data.map((r, i) => '<tr><td>' + [i + 1, ...c.map(r).map(v => e(v))].join('</td><td>') + '</td></tr>').join('')
+    : `<tr><td colspan="${c.headers.length + 1}" class="empty-tip">暂无数据</td></tr>`;
+}
+function doExport() {
+  const c = CONF[tab];
+  if (!data.length) return App.toast('没有可导出的数据', 'err');
+  App.exportExcel(c.title, ['序号', ...c.headers], data.map((r, i) => [i + 1, ...c.map(r)]), c.title.slice(0, 20));
+}
+function doPrint() { App.print(CONF[tab].title, ''); }
+load();
+</script>
+</body>
+</html>

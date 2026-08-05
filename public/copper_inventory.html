@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>铜线库存表</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container">
+
+  <!-- 录入 -->
+  <div class="card need-write no-print">
+    <h2>录入 / 调整库存 —— 仓库管理员填写</h2>
+    <div class="form-row">
+      <div class="form-item"><label><b>*</b> 铜线规格型号</label><input id="f_spec" class="spec-ac-input" autocomplete="off" placeholder="输入规格模糊筛选"></div>
+      <div class="form-item"><label><b>*</b> 库存量</label><input id="f_stock" type="number" step="0.0001" min="0" placeholder="如 50"></div>
+      <div class="form-item"><label>单位</label><input id="f_unit" value="kg"></div>
+      <div class="form-item" style="flex:2"><label>备注</label><input id="f_remark" placeholder="如 供应商 / 批号"></div>
+      <button class="btn green" style="align-self:end" onclick="save()">💾 保存（同规格自动累计入库）</button>
+    </div>
+    <p style="color:var(--muted);font-size:12.5px">
+      说明：同一规格重复保存会<b>累计加库存</b>（原库存 + 本次入库 = 最新库存量）；仓库领用铜线后，系统自动按「领出 − 回库」扣减对应规格库存；如需把某规格直接改为某个库存量，请用该行的【编辑】。
+    </p>
+  </div>
+
+  <!-- 查询 -->
+  <div class="card">
+    <div class="toolbar no-print">
+      <div class="form-item"><label>规格筛选</label><input id="q_spec" placeholder="模糊查询"></div>
+      <button class="btn" onclick="load()">🔍 查询</button>
+      <button class="btn ghost" onclick="resetQuery()">重置</button>
+      <a class="btn ghost mod-copper-wh" href="copper_inbound.html">📥 入库批次记录</a>
+      <span class="spacer"></span>
+      <button class="btn ghost admin-only" onclick="doExport()">📤 导出Excel</button>
+      <button class="btn ghost" onclick="App.print('铜线库存表','')">🖨️ 打印</button>
+      <span id="adminTools" style="display:none">
+        <button class="btn orange" onclick="dlTemplate()">📥 下载导入模板</button>
+        <label class="btn" style="cursor:pointer">📤 导入Excel
+          <input id="impFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="importXlsx()">
+        </label>
+      </span>
+    </div>
+
+    <div class="print-header"></div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>
+          <th>序号</th><th>铜线规格型号</th><th>库存量</th><th>单位</th><th>备注</th><th>更新时间</th>
+          <th class="actions-col need-write">操作</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="print-sign">
+      <span>仓库管理员：＿＿＿＿＿＿</span><span>复核：＿＿＿＿＿＿</span><span>主管：＿＿＿＿＿＿</span>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑弹窗 -->
+<div class="modal-mask" id="editMask" style="display:none">
+  <div class="modal">
+    <h3>编辑库存</h3>
+    <div class="form-row">
+      <div class="form-item"><label>铜线规格型号</label><input id="e_spec" class="spec-ac-input" autocomplete="off" placeholder="输入规格模糊筛选"></div>
+      <div class="form-item"><label>库存量</label><input id="e_stock" type="number" step="0.0001" min="0"></div>
+      <div class="form-item"><label>单位</label><input id="e_unit"></div>
+    </div>
+    <div class="form-row"><div class="form-item" style="flex:1"><label>备注</label><input id="e_remark" style="width:100%"></div></div>
+    <div class="actions">
+      <button class="btn ghost" onclick="$('#editMask').style.display='none'">取消</button>
+      <button class="btn" onclick="saveEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/vendor/xlsx.full.min.js"></script>
+<script src="js/app.js"></script>
+<script src="js/spec-ac.js"></script>
+<script>
+App.nav('copper_inventory.html');
+let rows = [], editId = null, SPECS = [];
+
+async function loadSpecs() { try { SPECS = window.SPECS = await App.get('/api/copper-specs'); } catch (e) { SPECS = []; } }
+if (App.isAdmin()) $('#adminTools').style.display = 'inline-flex';
+
+async function save() {
+  const spec = $('#f_spec').value.trim();
+  const stock = $('#f_stock').value;
+  if (!spec) return App.toast('请选择规格', 'err');
+  if (!SpecAC.isValid(spec)) return App.toast('请从下拉列表中选择有效的规格型号', 'err');
+  if (stock === '' || isNaN(parseFloat(stock))) return App.toast('请填写库存量', 'err');
+  const r = await App.post('/api/copper-inventory', {
+    spec, stock, unit: $('#f_unit').value.trim() || 'kg', remark: $('#f_remark').value.trim()
+  });
+  if (r && r.mode === 'add') {
+    App.toast('已累计入库：' + spec + ' 最新库存 ' + App.fmt(r.stock) + (r.unit || 'kg'), 'ok');
+  } else {
+    App.toast('已新增库存记录：' + spec + ' ' + App.fmt(r.stock) + (r.unit || 'kg'), 'ok');
+  }
+  $('#f_stock').value = ''; $('#f_remark').value = ''; load();
+}
+
+async function load() {
+  const p = new URLSearchParams();
+  if ($('#q_spec').value.trim()) p.set('spec', $('#q_spec').value.trim());
+  rows = await App.get('/api/copper-inventory?' + p);
+  const tb = $('#tbody'), e = App.escapeHtml;
+  if (!rows.length) { tb.innerHTML = '<tr><td colspan="7" class="empty-tip">暂无库存数据，请在上方录入</td></tr>'; return; }
+  tb.innerHTML = rows.map((r, i) => `<tr>
+    <td>${i + 1}</td><td><b>${e(r.spec)}</b></td><td class="num">${App.fmt(r.stock)}</td><td>${e(r.unit)}</td>
+    <td>${e(r.remark)}</td><td>${e(r.updated_at)}</td>
+    <td class="actions-col need-write">
+      <button class="btn sm ghost" onclick="openEdit(${r.id})">编辑</button>
+      <button class="btn sm red" onclick="delRow(${r.id})">删除</button>
+    </td></tr>`).join('');
+}
+function openEdit(id) {
+  const r = rows.find(x => x.id === id); if (!r) return;
+  editId = id;
+  $('#e_spec').value = r.spec; SpecAC.init($('#e_spec'));
+  $('#e_stock').value = r.stock; $('#e_unit').value = r.unit; $('#e_remark').value = r.remark;
+  $('#editMask').style.display = 'flex';
+}
+async function saveEdit() {
+  await App.put('/api/copper-inventory/' + editId, {
+    spec: $('#e_spec').value, stock: $('#e_stock').value,
+    unit: $('#e_unit').value.trim() || 'kg', remark: $('#e_remark').value.trim()
+  });
+  $('#editMask').style.display = 'none'; App.toast('已保存', 'ok'); load();
+}
+async function delRow(id) {
+  if (!confirm('确定删除该库存记录？')) return;
+  await App.del('/api/copper-inventory/' + id); App.toast('已删除', 'ok'); load();
+}
+function resetQuery() { $('#q_spec').value = ''; load(); }
+
+function doExport() {
+  if (!rows.length) return App.toast('没有可导出的数据', 'err');
+  App.exportExcel('铜线库存表',
+    ['序号', '铜线规格型号', '库存量', '单位', '备注', '更新时间'],
+    rows.map((r, i) => [i + 1, r.spec, +r.stock, r.unit, r.remark, r.updated_at]),
+    '铜线库存表', { title: '铜线库存表', numCols: [2], sign: ['仓库管理员：', '复核：', '主管：'] });
+}
+
+/* 管理员导入 / 导出模板（无缝导入：按导出模板填写后即可导入） */
+function dlTemplate() {
+  const headers = ['铜线规格型号', '库存量(kg)', '单位', '备注'];
+  const ex = [headers, ['示例：QZ-2-130L-0.50mm', 50, 'kg', '导入前请删除此示例行']];
+  const ws = XLSX.utils.aoa_to_sheet(ex);
+  ws['!cols'] = [{ wch: 24 }, { wch: 14 }, { wch: 8 }, { wch: 24 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '库存导入');
+  XLSX.writeFile(wb, '铜线库存导入模板.xlsx');
+  App.toast('模板已下载', 'ok');
+}
+async function importXlsx() {
+  const inp = $('#impFile'); if (!inp.files.length) return;
+  const f = inp.files[0];
+  const buf = await f.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const arr = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+  const imported = arr.map(o => {
+    const ks = Object.keys(o);
+    return {
+      spec: String(o[ks[0]] || '').trim(),
+      stock: o[ks[1]],
+      unit: String(o[ks[2]] || '').trim() || 'kg',
+      remark: String(o[ks[3]] || '').trim()
+    };
+  }).filter(r => r.spec && !/示例/.test(r.spec) && !/库存量/.test(r.spec));
+  if (!imported.length) return App.toast('模板中没有可导入的数据行', 'err');
+  const r = await App.post('/api/copper-inventory/import', { rows: imported });
+  inp.value = '';
+  App.toast('已导入 ' + (r.imported || imported.length) + ' 条', 'ok');
+  load();
+}
+
+(async () => { await loadSpecs(); SpecAC.init($('#f_spec')); load(); })();
+</script>
+</body>
+</html>

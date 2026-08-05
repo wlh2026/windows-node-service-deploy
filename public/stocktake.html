@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工具盘点</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container">
+
+  <div class="card need-write no-print">
+    <h2>发起盘点</h2>
+    <div class="toolbar">
+      <div class="form-item" style="flex:1"><label>盘点名称</label>
+        <input id="new_title" placeholder="如 2026年7月工具全面盘点" style="width:100%"></div>
+      <button class="btn green" onclick="createST()">＋ 生成盘点单（自动带入全部在册工具）</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 class="no-print">盘点单列表</h2>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>单号</th><th>盘点名称</th><th>发起时间</th><th>发起人</th><th>进度</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="listBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 盘点执行区 -->
+  <div class="card" id="detailCard" style="display:none">
+    <h2 id="dTitle"></h2>
+    <div class="toolbar no-print need-write" id="checkBar">
+      <div class="form-item" style="flex:1">
+        <label>扫码 / 输入工具编号清点（回车确认）</label>
+        <input id="checkInput" placeholder="扫码枪扫描工具二维码，自动打勾" style="width:100%;font-size:16px;padding:10px">
+      </div>
+      <button class="btn" onclick="doCheck()">✔ 清点</button>
+      <button class="btn red" onclick="finishST()">结束盘点并生成盈亏报告</button>
+    </div>
+    <div class="toolbar no-print">
+      <span id="dStat" style="font-weight:600"></span>
+      <span class="spacer"></span>
+      <button class="btn ghost" onclick="exportST()">📤 导出Excel</button>
+      <button class="btn ghost" onclick="printST()">🖨️ 打印盘点报告</button>
+    </div>
+    <div class="print-header"></div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>序号</th><th>工具编号</th><th>工具名称</th><th>账面状态</th><th>清点情况</th><th>清点时间</th><th>盘点结果</th></tr></thead>
+        <tbody id="dBody"></tbody>
+      </table>
+    </div>
+    <div class="print-sign">
+      <span>盘点人：＿＿＿＿＿＿</span><span>监盘人：＿＿＿＿＿＿</span><span>负责人：＿＿＿＿＿＿</span>
+    </div>
+  </div>
+</div>
+
+<script src="js/vendor/xlsx.full.min.js"></script>
+<script src="js/app.js"></script>
+<script>
+App.nav('stocktake.html');
+let curId = null, cur = null;
+
+async function loadList() {
+  const list = await App.get('/api/stocktakes');
+  const e = App.escapeHtml;
+  $('#listBody').innerHTML = list.length ? list.map(s => `<tr>
+    <td>${s.id}</td><td>${e(s.title)}</td><td>${s.start_time}</td><td>${e(s.operator)}</td>
+    <td>${s.done}/${s.total}</td>
+    <td><span class="tag ${s.status === '进行中' ? 'out' : 'in'}">${s.status}</span></td>
+    <td><button class="btn sm ghost" onclick="openST(${s.id})">打开</button></td></tr>`).join('')
+    : '<tr><td colspan="7" class="empty-tip">暂无盘点单</td></tr>';
+}
+async function createST() {
+  const r = await App.post('/api/stocktakes', { title: $('#new_title').value.trim() });
+  App.toast('盘点单已生成', 'ok');
+  $('#new_title').value = '';
+  await loadList(); openST(r.id);
+}
+async function openST(id) {
+  curId = id;
+  cur = await App.get('/api/stocktakes/' + id);
+  $('#detailCard').style.display = 'block';
+  $('#dTitle').textContent = '盘点单 #' + cur.id + '：' + cur.title + '（' + cur.status + '）';
+  $('#checkBar').style.display = cur.status === '进行中' && App.canWrite() ? 'flex' : 'none';
+  render();
+  if (cur.status === '进行中') $('#checkInput').focus();
+  $('#detailCard').scrollIntoView({ behavior: 'smooth' });
+}
+function render() {
+  const e = App.escapeHtml;
+  const done = cur.items.filter(i => i.checked).length;
+  const loss = cur.items.filter(i => i.result === '盘亏').length;
+  $('#dStat').innerHTML = `共 ${cur.items.length} 件，已清点 <span style="color:var(--green)">${done}</span> 件，` +
+    (cur.status === '已完成' ? `盘亏 <span style="color:var(--red)">${loss}</span> 件` : `未清点 ${cur.items.length - done} 件`);
+  $('#dBody').innerHTML = cur.items.map((it, i) => `<tr>
+    <td>${i + 1}</td><td><b>${e(it.tool_code)}</b></td><td>${e(it.tool_name)}</td><td>${it.expect_status}</td>
+    <td>${it.checked ? '<span class="tag in">已清点</span>' : '<span class="tag out">未清点</span>'}</td>
+    <td>${it.check_time || '-'}</td>
+    <td>${it.result === '盘亏' ? '<span class="tag fix">盘亏</span>' : (it.result || '-')}</td></tr>`).join('');
+}
+$('#checkInput').addEventListener('keydown', e => { if (e.key === 'Enter') doCheck(); });
+async function doCheck() {
+  const code = $('#checkInput').value.trim();
+  if (!code || !curId) return;
+  try {
+    const r = await App.post('/api/stocktakes/' + curId + '/check', { tool_code: code });
+    App.toast('✔ 已清点：' + r.code + ' ' + r.name, 'ok');
+    cur = await App.get('/api/stocktakes/' + curId);
+    render();
+  } catch (e) {}
+  $('#checkInput').value = ''; $('#checkInput').focus();
+}
+async function finishST() {
+  if (!confirm('结束盘点后，未清点工具将标记为「盘亏」，确定？')) return;
+  await App.post('/api/stocktakes/' + curId + '/finish');
+  App.toast('盘点已完成', 'ok');
+  await loadList(); openST(curId);
+}
+function exportST() {
+  if (!cur) return;
+  App.exportExcel('盘点报告-' + cur.title,
+    ['序号', '工具编号', '工具名称', '账面状态', '清点情况', '清点时间', '盘点结果'],
+    cur.items.map((it, i) => [i + 1, it.tool_code, it.tool_name, it.expect_status,
+      it.checked ? '已清点' : '未清点', it.check_time, it.result]),
+    '盘点报告');
+}
+function printST() {
+  if (!cur) return;
+  App.print('工具盘点报告 —— ' + cur.title, '盘点单号：#' + cur.id + '　发起时间：' + cur.start_time);
+}
+loadList();
+</script>
+</body>
+</html>

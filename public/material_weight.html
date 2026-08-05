@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>物料重量统计 · 四福车间管理系统</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <h2>➕ 录入来料重量</h2>
+    <div class="form-row">
+      <div class="form-item"><label>来料日期 <span class="req">*</span></label><input type="date" id="f_date"></div>
+      <div class="form-item"><label>BOM号 <span class="req">*</span></label><input id="f_bom" placeholder="如 BOM-2026-001"></div>
+      <div class="form-item"><label>批次号</label><input id="f_batch_no" placeholder="如 20260728-A"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-item"><label>物料名称</label><input id="f_material_name" placeholder="如 漆包线 / 绝缘材料 / 骨架"></div>
+      <div class="form-item"><label>规格型号</label><input id="f_spec" placeholder="如 QZ-2-130L-0.50mm"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-item"><label>重量(kg) <span class="req">*</span></label><input type="number" step="0.0001" min="0" id="f_weight" placeholder="来料实际重量"></div>
+      <div class="form-item" style="flex:2"><label>供应商</label><input id="f_supplier" placeholder="来料供应商名称"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-item" style="flex:1"><label>备注</label><input id="f_remark" style="width:100%" placeholder="批次/来料单号等"></div>
+    </div>
+    <div class="actions">
+      <button class="btn" onclick="save()">💾 保存记录</button>
+      <button class="btn ghost" onclick="resetForm()">清空</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>🔍 来料重量记录</h2>
+      <div class="toolbar">
+        <input type="date" id="q_from" title="起始日期">
+        <input type="date" id="q_to" title="结束日期">
+        <input id="q_bom" placeholder="BOM号">
+        <input id="q_batch_no" placeholder="批次号">
+        <input id="q_material_name" placeholder="物料名称">
+        <input id="q_spec" placeholder="规格型号">
+        <input id="q_supplier" placeholder="供应商">
+        <label class="chk"><input type="checkbox" id="q_anom"> 仅看异常</label>
+        <button class="btn" onclick="load()">查询</button>
+        <button class="btn ghost" onclick="resetQuery()">重置</button>
+        <button class="btn ghost" onclick="App.print('物料来料重量台账','')">🖨️ 打印</button>
+        <button class="btn green admin-only" onclick="doExport()">📤 导出Excel</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>
+          <th style="width:90px">来料日期</th>
+          <th>BOM号</th><th>批次号</th><th>物料名称</th><th>规格型号</th>
+          <th class="num" style="width:110px">重量(kg)</th>
+          <th>供应商</th><th>备注</th>
+          <th style="width:96px">状态</th>
+          <th style="width:110px">操作</th>
+        </tr></thead>
+        <tbody id="list"></tbody>
+      </table>
+    </div>
+    <div class="print-header"></div>
+  </div>
+
+  <div class="card">
+    <h2>📊 统计报表</h2>
+    <p class="tip">可按 <b>供应商</b> 或 <b>物料(规格型号)</b> 汇总来料重量；异常来料以红色标注。导出为带样式报表。</p>
+    <div class="tabs">
+      <button class="on" data-t="supplier" onclick="switchReport(this)">按供应商统计</button>
+      <button data-t="spec" onclick="switchReport(this)">按物料(规格)统计</button>
+    </div>
+    <div class="report-btns">
+      <button class="btn green" onclick="exportReport()">📤 导出当前报表Excel</button>
+      <span id="repSummary" class="muted"></span>
+    </div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead id="repHead"></thead>
+        <tbody id="repBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑弹窗 -->
+<div id="editMask" class="modal-mask" style="display:none">
+  <div class="modal">
+    <h3>编辑来料记录</h3>
+    <div class="form-row">
+      <div class="form-item"><label>来料日期 <span class="req">*</span></label><input type="date" id="e_date"></div>
+      <div class="form-item"><label>BOM号 <span class="req">*</span></label><input id="e_bom"></div>
+      <div class="form-item"><label>批次号</label><input id="e_batch_no"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-item"><label>物料名称</label><input id="e_material_name"></div>
+      <div class="form-item"><label>规格型号</label><input id="e_spec"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-item"><label>重量(kg) <span class="req">*</span></label><input type="number" step="0.0001" min="0" id="e_weight"></div>
+      <div class="form-item" style="flex:2"><label>供应商</label><input id="e_supplier"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-item" style="flex:1"><label>备注</label><input id="e_remark" style="width:100%"></div>
+    </div>
+    <div class="actions">
+      <button class="btn ghost" onclick="$('#editMask').style.display='none'">取消</button>
+      <button class="btn" onclick="saveEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/vendor/xlsx.full.min.js"></script>
+<script src="js/app.js"></script>
+<script>
+App.nav('material_weight.html');
+let rows = [], editId = null, repGroup = 'supplier', repData = { supplier: [], spec: [] };
+
+/* 物料名称/规格型号/批次号/供应商均为自由文本（品质部来料涵盖多种物料，不局限于铜线规格） */
+(async () => {
+  $('#f_date').value = App.today();
+  load();
+  renderReports();
+})();
+
+function q() {
+  const p = new URLSearchParams();
+  if ($('#q_from').value) p.set('date_from', $('#q_from').value);
+  if ($('#q_to').value) p.set('date_to', $('#q_to').value);
+  if ($('#q_bom').value.trim()) p.set('bom_no', $('#q_bom').value.trim());
+  if ($('#q_batch_no').value.trim()) p.set('batch_no', $('#q_batch_no').value.trim());
+  if ($('#q_material_name').value.trim()) p.set('material_name', $('#q_material_name').value.trim());
+  if ($('#q_spec').value.trim()) p.set('spec', $('#q_spec').value.trim());
+  if ($('#q_supplier').value.trim()) p.set('supplier', $('#q_supplier').value.trim());
+  if ($('#q_anom').checked) p.set('anomaly', '1');
+  return p.toString();
+}
+
+async function load() {
+  rows = await App.get('/api/material-weight?' + q());
+  render();
+}
+
+function render() {
+  const tb = $('#list');
+  if (!rows.length) { tb.innerHTML = '<tr><td colspan="10" class="empty-tip">暂无记录</td></tr>'; return; }
+  tb.innerHTML = rows.map(r => {
+    const anom = r.is_anomaly == 1;
+    const devTxt = anom ? `（${(r.deviation * 100).toFixed(2)}%）` : '';
+    return `<tr class="${anom ? 'row-anom' : ''}">
+      <td>${r.rec_date}</td>
+      <td>${App.escapeHtml(r.bom_no)}</td>
+      <td>${App.escapeHtml(r.batch_no)}</td>
+      <td>${App.escapeHtml(r.material_name)}</td>
+      <td>${App.escapeHtml(r.spec)}</td>
+      <td class="num">${App.fmt(r.weight)}</td>
+      <td>${App.escapeHtml(r.supplier)}</td>
+      <td>${App.escapeHtml(r.remark)}</td>
+      <td>${anom ? `<span class="tag anom">⚠异常${devTxt}</span>` : '<span class="tag in">正常</span>'}</td>
+      <td class="ops">
+        <button class="btn sm" onclick="openEdit(${r.id})">编辑</button>
+        <button class="btn sm ghost" onclick="del(${r.id})">删除</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/* 同BOM号历史基准，用于保存前异常提醒 */
+async function previewAnomaly(bomNo, weight) {
+  if (!bomNo) return null;
+  const list = await App.get('/api/material-weight?bom_no=' + encodeURIComponent(bomNo));
+  if (!list.length) return null;
+  const base = list[list.length - 1].weight; // 列表按时间倒序，末条即最早
+  if (!base) return null;
+  const dev = (weight - base) / base;
+  return { base, dev, is_anomaly: Math.abs(dev) > 0.03 };
+}
+
+async function save() {
+  const bom = $('#f_bom').value.trim();
+  const weight = parseFloat($('#f_weight').value);
+  if (!$('#f_date').value || !bom) return App.toast('来料日期、BOM号必填', 'err');
+  if (isNaN(weight)) return App.toast('重量必须为数字', 'err');
+  // 异常提醒：同BOM号历史偏差超 ±3%
+  const prev = await previewAnomaly(bom, weight);
+  if (prev && prev.is_anomaly) {
+    const ok = confirm(`⚠ 重量异常提醒\nBOM号「${bom}」历史基准重量 ${App.fmt(prev.base)} kg，\n本次录入 ${App.fmt(weight)} kg，偏差 ${(prev.dev * 100).toFixed(2)}%，超出 ±3%。\n\n仍要保存吗？`);
+    if (!ok) return;
+  }
+  const r = await App.post('/api/material-weight', {
+    rec_date: $('#f_date').value, bom_no: bom,
+    batch_no: $('#f_batch_no').value.trim(),
+    material_name: $('#f_material_name').value.trim(),
+    spec: $('#f_spec').value.trim(),
+    weight, supplier: $('#f_supplier').value.trim(), remark: $('#f_remark').value.trim()
+  });
+  if (r.is_anomaly) App.toast('已保存，但重量偏差超 ±3%，已标记异常', 'err');
+  else App.toast('已保存', 'ok');
+  resetForm();
+  load(); renderReports();
+}
+
+function resetForm() {
+  $('#f_date').value = App.today();
+  $('#f_bom').value = ''; $('#f_batch_no').value = ''; $('#f_material_name').value = '';
+  $('#f_spec').value = ''; $('#f_weight').value = '';
+  $('#f_supplier').value = ''; $('#f_remark').value = '';
+}
+
+function openEdit(id) {
+  const r = rows.find(x => x.id === id); if (!r) return;
+  editId = id;
+  $('#e_date').value = r.rec_date; $('#e_bom').value = r.bom_no;
+  $('#e_batch_no').value = r.batch_no || ''; $('#e_material_name').value = r.material_name || '';
+  $('#e_spec').value = r.spec;
+  $('#e_weight').value = r.weight; $('#e_supplier').value = r.supplier; $('#e_remark').value = r.remark;
+  $('#editMask').style.display = 'flex';
+}
+async function saveEdit() {
+  const bom = $('#e_bom').value.trim();
+  const weight = parseFloat($('#e_weight').value);
+  if (!$('#e_date').value || !bom) return App.toast('来料日期、BOM号必填', 'err');
+  if (isNaN(weight)) return App.toast('重量必须为数字', 'err');
+  const prev = await previewAnomaly(bom, weight);
+  if (prev && prev.is_anomaly) {
+    const ok = confirm(`⚠ 重量异常提醒\nBOM号「${bom}」历史基准重量 ${App.fmt(prev.base)} kg，\n本次修改 ${App.fmt(weight)} kg，偏差 ${(prev.dev * 100).toFixed(2)}%，超出 ±3%。\n\n仍要保存吗？`);
+    if (!ok) return;
+  }
+  const r = await App.put('/api/material-weight/' + editId, {
+    rec_date: $('#e_date').value, bom_no: bom,
+    batch_no: $('#e_batch_no').value.trim(),
+    material_name: $('#e_material_name').value.trim(),
+    spec: $('#e_spec').value.trim(),
+    weight, supplier: $('#e_supplier').value.trim(), remark: $('#e_remark').value.trim()
+  });
+  if (r.is_anomaly) App.toast('已更新，重量偏差超 ±3%，已标记异常', 'err');
+  else App.toast('已更新', 'ok');
+  $('#editMask').style.display = 'none';
+  load(); renderReports();
+}
+async function del(id) {
+  if (!confirm('确定删除该记录？')) return;
+  await App.del('/api/material-weight/' + id);
+  App.toast('已删除', 'ok');
+  load(); renderReports();
+}
+
+function resetQuery() {
+  $('#q_from').value = ''; $('#q_to').value = ''; $('#q_bom').value = '';
+  $('#q_batch_no').value = ''; $('#q_material_name').value = '';
+  $('#q_spec').value = ''; $('#q_supplier').value = ''; $('#q_anom').checked = false;
+  load();
+}
+
+/* ===== 统计报表 ===== */
+function switchReport(btn) {
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  repGroup = btn.dataset.t;
+  drawReport();
+}
+async function renderReports() {
+  const [s, sp] = await Promise.all([
+    App.get('/api/stats/material-weight?group=supplier'),
+    App.get('/api/stats/material-weight?group=spec')
+  ]);
+  repData.supplier = s.rows; repData.spec = sp.rows;
+  drawReport();
+}
+function drawReport() {
+  const data = repData[repGroup] || [];
+  const isSup = repGroup === 'supplier';
+  const cols = isSup ? 6 : 7;
+  $('#repHead').innerHTML = `<tr>
+    <th>${isSup ? '供应商' : '规格型号(物料)'}</th>
+    ${isSup ? '' : '<th>物料名称</th>'}
+    <th class="num">记录数</th>
+    <th class="num">总重量(kg)</th>
+    <th class="num">平均重量(kg)</th>
+    <th class="num">异常数</th>
+    <th class="num">涉及BOM数</th>
+  </tr>`;
+  if (!data.length) { $('#repBody').innerHTML = '<tr><td colspan="' + cols + '" class="empty-tip">暂无数据</td></tr>'; $('#repSummary').textContent = ''; return; }
+  let tc = 0, tw = 0, ta = 0;
+  $('#repBody').innerHTML = data.map(r => {
+    tc += r.cnt; tw += r.total_w; ta += r.anomaly_cnt;
+    const anomCls = r.anomaly_cnt > 0 ? 'class="num anom-cell"' : 'class="num"';
+    return `<tr>
+      <td>${App.escapeHtml(r.gkey || '(未填)')}</td>
+      ${isSup ? '' : `<td>${App.escapeHtml(r.material_names || '')}</td>`}
+      <td class="num">${r.cnt}</td>
+      <td class="num">${App.fmt(r.total_w)}</td>
+      <td class="num">${App.fmt(r.avg_w)}</td>
+      <td ${anomCls}>${r.anomaly_cnt}</td>
+      <td class="num">${r.bom_cnt}</td>
+    </tr>`;
+  }).join('') + `<tr class="rep-total">
+      <td>合计</td>${isSup ? '' : '<td>—</td>'}
+      <td class="num">${tc}</td>
+      <td class="num">${App.fmt(tw)}</td><td class="num">—</td>
+      <td class="num">${ta}</td><td class="num">—</td>
+    </tr>`;
+  $('#repSummary').textContent = `共 ${data.length} 项，总记录 ${tc} 条，总重量 ${App.fmt(tw)} kg，异常 ${ta} 条`;
+}
+function exportReport() {
+  const isSup = repGroup === 'supplier';
+  const data = repData[repGroup] || [];
+  if (!data.length) return App.toast('没有可导出的数据', 'err');
+  const headers = [isSup ? '供应商' : '规格型号(物料)'];
+  if (!isSup) headers.push('物料名称');
+  headers.push('记录数', '总重量(kg)', '平均重量(kg)', '异常数', '涉及BOM数');
+  const rowsE = data.map(r => {
+    const base = [r.gkey || '(未填)'];
+    if (!isSup) base.push(r.material_names || '');
+    base.push(r.cnt, +Number(r.total_w).toFixed(4), +Number(r.avg_w).toFixed(4), r.anomaly_cnt, r.bom_cnt);
+    return base;
+  });
+  const sumCnt = data.reduce((a, r) => a + r.cnt, 0);
+  const sumW = data.reduce((a, r) => a + r.total_w, 0);
+  const sumA = data.reduce((a, r) => a + r.anomaly_cnt, 0);
+  const totals = ['合计'];
+  if (!isSup) totals.push('—');
+  totals.push(sumCnt, +Number(sumW).toFixed(4), '', sumA, '');
+  App.exportExcel('物料重量统计报表-' + (isSup ? '按供应商' : '按物料'), headers, rowsE, isSup ? '按供应商' : '按物料', {
+    title: '物料来料重量统计报表（' + (isSup ? '按供应商' : '按物料(规格)') + '）',
+    meta: '导出人：' + (App.user ? App.user.name : '') + '　导出时间：' + new Date().toLocaleString(),
+    totals,
+    numCols: isSup ? [2, 3] : [2, 3],
+    colorCols: isSup ? { 4: v => v > 0 ? 'C00000' : '006100' } : { 5: v => v > 0 ? 'C00000' : '006100' },
+    sign: ['制表人：' + (App.user ? App.user.name : ''), '审核人：', '日期：' + new Date().toLocaleDateString()]
+  });
+}
+function doExport() {
+  if (!rows.length) return App.toast('没有可导出的数据', 'err');
+  const headers = ['来料日期', 'BOM号', '批次号', '物料名称', '规格型号', '重量(kg)', '供应商', '备注', '是否异常', '偏差'];
+  const rowsE = rows.map(r => [r.rec_date, r.bom_no, r.batch_no || '', r.material_name || '', r.spec,
+    +Number(r.weight).toFixed(4), r.supplier, r.remark,
+    r.is_anomaly == 1 ? '异常' : '正常', r.is_anomaly == 1 ? (r.deviation * 100).toFixed(2) + '%' : '']);
+  App.exportExcel('物料来料重量台账', headers, rowsE, '来料台账', {
+    title: '物料来料重量台账',
+    meta: '导出人：' + (App.user ? App.user.name : '') + '　导出时间：' + new Date().toLocaleString(),
+    numCols: [5],
+    colorCols: { 8: v => v === '异常' ? 'C00000' : '006100' },
+    sign: ['制表人：' + (App.user ? App.user.name : ''), '审核人：', '日期：' + new Date().toLocaleDateString()]
+  });
+}
+</script>
+</body>
+</html>

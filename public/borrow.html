@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工具借用与归还</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.scan-box { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+.scan-box input.big { font-size: 17px; padding: 10px 14px; min-width: 240px; }
+.tool-info { background: #eef4fd; border: 1px dashed var(--primary); border-radius: 8px;
+  padding: 10px 14px; margin: 10px 0; display: none; }
+#video { width: 100%; max-width: 420px; border-radius: 10px; display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="card need-write no-print">
+    <h2>扫码 / 输入工具编号（支持扫码枪，光标置于输入框直接扫码）</h2>
+    <div class="scan-box">
+      <div class="form-item" style="flex:1">
+        <label>工具编号（扫码枪扫描或手工输入后回车）</label>
+        <input class="big" id="scanInput" placeholder="如 DZ-001，扫码枪扫描后自动识别" autofocus>
+      </div>
+      <button class="btn" onclick="lookup()">查找工具</button>
+    </div>
+    <div class="tool-info" id="toolInfo"></div>
+
+    <!-- 借用表单 -->
+    <div id="borrowForm" style="display:none">
+      <h3 style="color:var(--green)">▶ 办理借用登记</h3>
+      <div class="form-row">
+        <div class="form-item"><label><b>*</b> 借用人</label><input id="b_borrower"></div>
+        <div class="form-item"><label>班组/部门</label><input id="b_dept"></div>
+        <div class="form-item"><label>借用时间</label><input type="datetime-local" id="b_time"></div>
+        <div class="form-item"><label>预计归还时间</label><input type="datetime-local" id="b_expect"></div>
+        <div class="form-item" style="flex:1"><label>借用用途/工单号</label><input id="b_purpose" style="width:100%"></div>
+      </div>
+      <button class="btn green" onclick="doBorrow()">✔ 确认借出</button>
+    </div>
+
+    <!-- 归还表单 -->
+    <div id="returnForm" style="display:none">
+      <h3 style="color:var(--orange)">◀ 办理归还登记</h3>
+      <div id="borrowDetail" style="margin-bottom:10px;color:var(--muted)"></div>
+      <div class="form-row">
+        <div class="form-item"><label>归还人</label><input id="r_returner"></div>
+        <div class="form-item"><label>实际归还时间</label><input type="datetime-local" id="r_time"></div>
+        <div class="form-item"><label><b>*</b> 工具状态检查</label>
+          <select id="r_state"><option>完好</option><option>待维修</option><option>已损坏</option></select></div>
+      </div>
+      <p style="color:var(--muted);font-size:12.5px;margin-bottom:8px">选择「待维修/已损坏」将自动转入维修台账并把工具状态改为维修中。</p>
+      <button class="btn orange" onclick="doReturn()">✔ 确认归还</button>
+    </div>
+  </div>
+
+  <!-- 借用记录 -->
+  <div class="card">
+    <div class="toolbar no-print">
+      <div class="form-item"><label>状态</label>
+        <select id="q_status"><option value="">全部</option><option>借出中</option><option>已归还</option></select></div>
+      <div class="form-item"><label>借用人</label><input id="q_borrower"></div>
+      <div class="form-item"><label>工具</label><input id="q_tool" placeholder="编号或名称"></div>
+      <div class="form-item"><label>借用日期从</label><input type="date" id="q_from"></div>
+      <div class="form-item"><label>到</label><input type="date" id="q_to"></div>
+      <label style="display:flex;align-items:center;gap:4px;padding-bottom:8px">
+        <input type="checkbox" id="q_overdue" style="min-width:auto"> 仅看逾期</label>
+      <button class="btn" onclick="load()">🔍 查询</button>
+      <span class="spacer"></span>
+      <button class="btn ghost" onclick="doExport()">📤 导出Excel</button>
+      <button class="btn ghost" onclick="App.print('工具借用归还明细表','')">🖨️ 打印</button>
+    </div>
+    <div class="print-header"></div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>
+          <th>序号</th><th>工具编号</th><th>工具名称</th><th>借用人</th><th>班组/部门</th><th>借用时间</th>
+          <th>预计归还</th><th>用途/工单号</th><th>实际归还</th><th>归还人</th><th>归还状态</th><th>当前状态</th>
+          <th class="actions-col need-write">操作</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="js/vendor/xlsx.full.min.js"></script>
+<script src="js/app.js"></script>
+<script>
+App.nav('borrow.html');
+let rows = [], curTool = null, curBorrow = null;
+
+/* 扫码枪 = 快速键盘输入+回车，直接监听回车即可 */
+$('#scanInput').addEventListener('keydown', e => { if (e.key === 'Enter') lookup(); });
+
+async function lookup() {
+  const code = $('#scanInput').value.trim();
+  if (!code) return;
+  $('#borrowForm').style.display = 'none'; $('#returnForm').style.display = 'none';
+  try {
+    curTool = await App.get('/api/tools/by-code/' + encodeURIComponent(code));
+  } catch (e) { $('#toolInfo').style.display = 'none'; return; }
+  const t = curTool, e2 = App.escapeHtml;
+  $('#toolInfo').style.display = 'block';
+  $('#toolInfo').innerHTML = `<b>${e2(t.code)}</b>　${e2(t.name)} ${e2(t.model)}　
+    品牌：${e2(t.brand) || '-'}　位置：${e2(t.location) || '-'}　
+    当前状态：<span class="tag ${t.status === '在库' ? 'in' : t.status === '借出' ? 'out' : 'fix'}">${t.status}</span>`;
+  if (t.status === '在库') {
+    $('#borrowForm').style.display = 'block';
+    $('#b_time').value = App.nowLocal();
+    $('#b_borrower').focus();
+  } else if (t.status === '借出') {
+    const list = await App.get('/api/borrows?status=' + encodeURIComponent('借出中') + '&tool=' + encodeURIComponent(t.code));
+    curBorrow = list.find(b => b.tool_code === t.code);
+    if (curBorrow) {
+      $('#returnForm').style.display = 'block';
+      $('#borrowDetail').innerHTML = `借用人：<b>${e2(curBorrow.borrower)}</b>（${e2(curBorrow.borrower_dept) || '-'}）　
+        借用时间：${curBorrow.borrow_time}　预计归还：${curBorrow.expect_return || '-'}　用途：${e2(curBorrow.purpose) || '-'}`;
+      $('#r_time').value = App.nowLocal();
+      $('#r_returner').value = curBorrow.borrower;
+    }
+  } else {
+    App.toast('该工具当前状态为「' + t.status + '」，不能借用', 'err');
+  }
+}
+
+async function doBorrow() {
+  if (!curTool) return;
+  if (!$('#b_borrower').value.trim()) return App.toast('请填写借用人', 'err');
+  await App.post('/api/borrows', {
+    tool_code: curTool.code, borrower: $('#b_borrower').value.trim(), borrower_dept: $('#b_dept').value.trim(),
+    borrow_time: $('#b_time').value.replace('T', ' '), expect_return: $('#b_expect').value.replace('T', ' '),
+    purpose: $('#b_purpose').value.trim()
+  });
+  App.toast('借出成功：' + curTool.code, 'ok');
+  resetScan(); load();
+}
+async function doReturn() {
+  if (!curBorrow) return;
+  await App.post('/api/borrows/' + curBorrow.id + '/return', {
+    return_time: $('#r_time').value.replace('T', ' '), returner: $('#r_returner').value.trim(),
+    return_state: $('#r_state').value
+  });
+  App.toast('归还成功', 'ok');
+  resetScan(); load();
+}
+function resetScan() {
+  $('#scanInput').value = ''; $('#toolInfo').style.display = 'none';
+  $('#borrowForm').style.display = 'none'; $('#returnForm').style.display = 'none';
+  ['b_borrower', 'b_dept', 'b_expect', 'b_purpose'].forEach(i => $('#' + i).value = '');
+  curTool = null; curBorrow = null;
+  $('#scanInput').focus();
+}
+
+async function load() {
+  const p = new URLSearchParams();
+  if ($('#q_status').value) p.set('status', $('#q_status').value);
+  if ($('#q_borrower').value.trim()) p.set('borrower', $('#q_borrower').value.trim());
+  if ($('#q_tool').value.trim()) p.set('tool', $('#q_tool').value.trim());
+  if ($('#q_from').value) p.set('from', $('#q_from').value);
+  if ($('#q_to').value) p.set('to', $('#q_to').value);
+  if ($('#q_overdue').checked) p.set('overdue', '1');
+  rows = await App.get('/api/borrows?' + p);
+  const e = App.escapeHtml, now = new Date().toISOString().replace('T', ' ');
+  $('#tbody').innerHTML = rows.length ? rows.map((r, i) => {
+    const overdue = r.status === '借出中' && r.expect_return && r.expect_return < App.nowLocal().replace('T', ' ');
+    return `<tr>
+    <td>${i + 1}</td><td><b>${e(r.tool_code)}</b></td><td>${e(r.tool_name || '')}</td>
+    <td>${e(r.borrower)}</td><td>${e(r.borrower_dept)}</td><td>${r.borrow_time}</td>
+    <td>${r.expect_return || '-'}${overdue ? ' <span class="tag fix">逾期</span>' : ''}</td>
+    <td>${e(r.purpose)}</td><td>${r.return_time || '-'}</td><td>${e(r.returner) || '-'}</td>
+    <td>${r.return_state || '-'}</td>
+    <td><span class="tag ${r.status === '借出中' ? 'out' : 'in'}">${r.status}</span></td>
+    <td class="actions-col need-write">${r.status === '借出中'
+      ? `<button class="btn sm orange" onclick="quickReturn(${r.id},'${e(r.tool_code)}')">归还</button>` : ''}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="13" class="empty-tip">暂无记录</td></tr>';
+}
+function quickReturn(id, code) {
+  $('#scanInput').value = code; lookup();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function doExport() {
+  if (!rows.length) return App.toast('没有可导出的数据', 'err');
+  App.exportExcel('工具借用归还明细表',
+    ['序号', '工具编号', '工具名称', '借用人', '班组/部门', '借用时间', '预计归还', '用途/工单号', '实际归还', '归还人', '归还状态', '当前状态'],
+    rows.map((r, i) => [i + 1, r.tool_code, r.tool_name, r.borrower, r.borrower_dept, r.borrow_time,
+      r.expect_return, r.purpose, r.return_time, r.returner, r.return_state, r.status]),
+    '借还明细');
+}
+load();
+</script>
+</body>
+</html>

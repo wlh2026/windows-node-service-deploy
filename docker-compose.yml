@@ -1,0 +1,23 @@
+# 四福车间管理系统 - Docker Compose 部署文件（绿联 4600 NAS / 任意 Docker 主机）
+# 用法：
+#   1. 把本文件与 Dockerfile 放在同一目录
+#   2. 在该目录执行：  docker compose up -d --build
+#   3. 浏览器访问：    http://<NAS的IP>:8090
+#
+# 数据持久化：宿主机的 ./data 目录映射到容器 /app/data，
+#   数据库 data.db、版本文件、更新日志全部保存在这里，容器重建不丢数据。
+
+services:
+  workshop:
+    build: .
+    image: workshop-mgmt:1.0.2
+    container_name: workshop-mgmt
+    restart: unless-stopped          # 开机/崩溃后自动重启
+    ports:
+      - "8090:8090"
+    environment:
+      - PORT=8090
+      - DATA_DIR=/app/data
+    volumes:
+      - ./data:/app/data             # 持久化数据（务必映射到宿主磁盘）
+    # 如需修改宿主机端口，改上面 "8090:8090" 的左边即可，例如 "9000:8090"

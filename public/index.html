@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>总览看板 - 四福车间管理系统</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container">
+
+  <div class="card mod-tools">
+    <h2>工具库存看板</h2>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="num" id="k_total">-</div><div class="lbl">在册工具总数</div></div>
+      <div class="kpi ok"><div class="num" id="k_in">-</div><div class="lbl">在库</div></div>
+      <div class="kpi warn"><div class="num" id="k_out">-</div><div class="lbl">已借出</div></div>
+      <div class="kpi danger"><div class="num" id="k_fix">-</div><div class="lbl">维修中</div></div>
+      <div class="kpi"><div class="num" id="k_dead" style="color:#888">-</div><div class="lbl">已报废(累计)</div></div>
+    </div>
+    <!-- 工具库存看板：4 个排行 -->
+    <div class="rank-grid">
+      <div class="table-wrap">
+        <h3>📈 库存最多的前三物料</h3>
+        <table class="data"><thead><tr><th>排名</th><th>物料编号</th><th>名称</th><th>类别</th><th>库存数量</th></tr></thead>
+          <tbody id="topStockBody"></tbody></table>
+      </div>
+      <div class="table-wrap">
+        <h3>⚠️ 库存小于3的前三物料</h3>
+        <table class="data"><thead><tr><th>排名</th><th>物料编号</th><th>名称</th><th>类别</th><th>库存数量</th></tr></thead>
+          <tbody id="lowStock3Body"></tbody></table>
+      </div>
+      <div class="table-wrap">
+        <h3>👤 领用物料最多的人员（前三）</h3>
+        <table class="data"><thead><tr><th>排名</th><th>借用人</th><th>班组/部门</th><th>领用次数</th></tr></thead>
+          <tbody id="topBorrowersBody"></tbody></table>
+      </div>
+      <div class="table-wrap">
+        <h3>🗑️ 报废最多的人员（前三）</h3>
+        <table class="data"><thead><tr><th>排名</th><th>人员（批准人）</th><th>报废次数</th></tr></thead>
+          <tbody id="topScrappersBody"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mod-tools" id="issueCard">
+    <h2>最近工具领用（前5条）</h2>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>领用日期</th><th>工具编号</th><th>工具名称</th><th>领用人</th><th>班组/部门</th><th>领用类型</th><th>数量</th><th>用途</th></tr></thead>
+        <tbody id="recentIssuesBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" id="wireCard">
+    <h2>今日铜线台账速览（{今天}）</h2>
+    <div class="kpi-grid mod-copper" id="wireKpis">
+      <div class="kpi"><div class="num" id="w_task">-</div><div class="lbl">今日任务单(个)</div></div>
+      <div class="kpi"><div class="num" id="w_prod">-</div><div class="lbl">生产记录(条)</div></div>
+      <div class="kpi"><div class="num" id="w_prodw">-</div><div class="lbl">实际生产重量(kg)</div></div>
+      <div class="kpi danger"><div class="num" id="w_bomfix">-</div><div class="lbl">今日需修改BOM(条)</div></div>
+      <div class="kpi"><div class="num" id="w_tasktotal">-</div><div class="lbl">累计任务单(个)</div></div>
+      <div class="kpi warn"><div class="num" id="w_bomtotal">-</div><div class="lbl">累计需修改BOM(条)</div></div>
+    </div>
+    <div class="kpi-grid mod-copper-wh" id="whKpis" style="margin-top:10px">
+      <div class="kpi"><div class="num" id="w_out">-</div><div class="lbl">今日领出(kg)</div></div>
+      <div class="kpi"><div class="num" id="w_ret">-</div><div class="lbl">今日回库(kg)</div></div>
+      <div class="kpi danger"><div class="num" id="w_scrap">-</div><div class="lbl">线头报废(kg)</div></div>
+    </div>
+  </div>
+
+  <div class="card" id="copperInvCard" style="display:none">
+    <h2>铜线库存看板</h2>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="num" id="ci_count">-</div><div class="lbl">库存规格数</div></div>
+      <div class="kpi"><div class="num" id="ci_total">-</div><div class="lbl">库存总量(kg)</div></div>
+    </div>
+    <div class="rank-grid">
+      <div class="table-wrap">
+        <h3>📈 库存量最高前三</h3>
+        <table class="data"><thead><tr><th>排名</th><th>规格型号</th><th>库存量</th><th>单位</th></tr></thead>
+          <tbody id="ciTopBody"></tbody></table>
+      </div>
+      <div class="table-wrap">
+        <h3>⚠️ 库存量最低前三</h3>
+        <table class="data"><thead><tr><th>排名</th><th>规格型号</th><th>库存量</th><th>单位</th></tr></thead>
+          <tbody id="ciBottomBody"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="mwCard" style="display:none">
+    <h2>物料来料重量统计</h2>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="num" id="mw_total">-</div><div class="lbl">来料记录总数</div></div>
+      <div class="kpi danger"><div class="num" id="mw_anom">-</div><div class="lbl">重量异常(条)</div></div>
+      <div class="kpi"><div class="num" id="mw_bom">-</div><div class="lbl">涉及BOM数</div></div>
+      <div class="kpi"><div class="num" id="mw_sup">-</div><div class="lbl">供应商数</div></div>
+    </div>
+    <div class="table-wrap">
+      <h3>最近来料（前5条）</h3>
+      <table class="data"><thead><tr><th>来料日期</th><th>BOM号</th><th>规格型号</th><th>重量(kg)</th><th>供应商</th><th>状态</th></tr></thead>
+        <tbody id="mwRecentBody"></tbody></table>
+    </div>
+  </div>
+
+  <div class="card mod-copper" id="taskDailyCard" style="display:none">
+    <h2>每日任务单数量统计（近14天）</h2>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>日期</th><th>任务单数量(个)</th><th>录入记录(条)</th><th>需修改BOM(条)</th></tr></thead>
+        <tbody id="taskDailyBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" id="overdueCard" style="display:none">
+    <h2 style="border-left-color:var(--red);color:var(--red)">⚠️ 逾期未还提醒</h2>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>工具编号</th><th>工具名称</th><th>借用人</th><th>班组/部门</th><th>借用时间</th><th>预计归还</th><th>操作</th></tr></thead>
+        <tbody id="overdueBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" id="lowCard" style="display:none">
+    <h2 style="border-left-color:var(--orange);color:var(--orange)">📦 安全库存预警（易耗品需补货）</h2>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>工具编号</th><th>名称</th><th>当前数量</th><th>安全库存线</th></tr></thead>
+        <tbody id="lowBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" id="maintCard" style="display:none">
+    <h2 style="border-left-color:var(--orange);color:var(--orange)">🔧 保养到期提醒</h2>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>工具编号</th><th>名称</th><th>保养周期(天)</th><th>上次保养</th></tr></thead>
+        <tbody id="maintBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>快捷入口</h2>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <a class="btn mod-copper" href="production.html">📝 录生产对比表</a>
+      <a class="btn mod-copper-wh" href="warehouse.html">📦 录仓库铜线领用表</a>
+      <a class="btn orange mod-copper-wh" href="copper_inventory.html">📊 铜线库存</a>
+      <a class="btn ghost mod-copper-wh" href="copper_inbound.html">📥 铜线入库记录</a>
+      <a class="btn green" id="mwEntry" style="display:none" href="material_weight.html">📏 物料重量统计</a>
+      <a class="btn mod-tools" href="tool_issue.html">📥 工具领用</a>
+      <a class="btn green mod-tools" href="borrow.html">🔄 工具借还(扫码)</a>
+      <a class="btn ghost mod-tools" href="tools.html">🧰 工具档案</a>
+      <a class="btn ghost mod-tools" href="tool_inbound.html">📥 工具入库记录</a>
+      <a class="btn ghost mod-tools" href="stocktake.html">📋 盘点</a>
+      <a class="btn ghost mod-tools" href="reports.html">📊 统计报表</a>
+      <a class="btn orange" id="backupBtn" style="display:none" href="javascript:void(0)" onclick="backup()">💾 备份数据库</a>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+App.nav('index.html');
+if (App.isAdmin()) $('#backupBtn').style.display = 'inline-flex';
+
+// 按角色隐藏无权限模块的卡片和入口
+if (!App.hasModule('tools')) $$('.mod-tools').forEach(el => el.style.display = 'none');
+// 今日铜线台账卡片：有生产对比表或仓库领用表权限才显示
+if (!App.hasModule('copper') && !App.hasModule('copper_wh')) $('#wireCard').style.display = 'none';
+if (!App.hasModule('copper')) $$('.mod-copper').forEach(el => el.style.display = 'none');
+if (!App.hasModule('copper_wh')) $$('.mod-copper-wh').forEach(el => el.style.display = 'none');
+if (App.hasModule('material_weight')) $('#mwEntry').style.display = 'inline-flex';
+
+$('#wireCard').querySelector('h2').textContent = '今日铜线台账速览（' + App.today() + '）';
+
+async function load() {
+  const d = await App.get('/api/dashboard');
+  const e = App.escapeHtml;
+  if (d.prodToday) {
+    $('#w_prod').textContent = d.prodToday.c;
+    $('#w_prodw').textContent = (+d.prodToday.w).toFixed(4);
+    $('#w_task').textContent = d.taskToday;
+    $('#w_tasktotal').textContent = d.taskTotal;
+    $('#w_bomfix').textContent = d.bomFixToday;
+    $('#w_bomtotal').textContent = d.bomFixTotal;
+    // 今日无超差则去掉红色强调
+    if (!d.bomFixToday) $('#w_bomfix').parentElement.classList.remove('danger');
+    if (d.taskDaily && d.taskDaily.length) {
+      $('#taskDailyCard').style.display = 'block';
+      $('#taskDailyBody').innerHTML = d.taskDaily.map(r => `<tr>
+        <td>${e(r.rec_date)}</td><td><b>${r.tasks}</b></td><td>${r.recs}</td>
+        <td style="${r.bom_fix > 0 ? 'color:var(--red);font-weight:700' : 'color:var(--green)'}">${r.bom_fix}${r.bom_fix > 0 ? ' ⚠' : ''}</td></tr>`).join('');
+    }
+  }
+  if (d.whToday) {
+    $('#w_out').textContent = (+d.whToday.o).toFixed(4);
+    $('#w_ret').textContent = (+d.whToday.r).toFixed(4);
+    $('#w_scrap').textContent = (+d.whToday.s).toFixed(4);
+  }
+  if (d.copperInvTop) {
+    $('#copperInvCard').style.display = 'block';
+    const e2 = App.escapeHtml;
+    $('#ci_count').textContent = d.copperInvTotal.c;
+    $('#ci_total').textContent = (+d.copperInvTotal.s).toFixed(4);
+    $('#ciTopBody').innerHTML = d.copperInvTop.length
+      ? d.copperInvTop.map((r, i) => `<tr><td>${i + 1}</td><td><b>${e2(r.spec)}</b></td><td class="num">${App.fmt(r.stock)}</td><td>${e2(r.unit)}</td></tr>`).join('')
+      : '<tr><td colspan="4" class="empty-tip">暂无库存</td></tr>';
+    $('#ciBottomBody').innerHTML = d.copperInvBottom.length
+      ? d.copperInvBottom.map((r, i) => `<tr><td>${i + 1}</td><td><b>${e2(r.spec)}</b></td><td class="num" style="color:var(--red);font-weight:700">${App.fmt(r.stock)}</td><td>${e2(r.unit)}</td></tr>`).join('')
+      : '<tr><td colspan="4" class="empty-tip">暂无库存</td></tr>';
+  }
+  if (d.mwTotal !== undefined) {
+    $('#mwCard').style.display = 'block';
+    $('#mw_total').textContent = d.mwTotal;
+    $('#mw_anom').textContent = d.mwAnomaly;
+    $('#mw_bom').textContent = d.mwBom;
+    $('#mw_sup').textContent = d.mwSupplier;
+    if (!d.mwAnomaly) $('#mw_anom').parentElement.classList.remove('danger');
+    $('#mwRecentBody').innerHTML = d.mwRecent.length
+      ? d.mwRecent.map(r => `<tr>
+        <td>${e(r.rec_date)}</td><td><b>${e(r.bom_no)}</b></td><td>${e(r.spec)}</td>
+        <td class="num">${App.fmt(r.weight)}</td><td>${e(r.supplier)}</td>
+        <td>${r.is_anomaly == 1 ? '<span class="tag anom">⚠异常</span>' : '<span class="tag in">正常</span>'}</td></tr>`).join('')
+      : '<tr><td colspan="6" class="empty-tip">暂无来料记录</td></tr>';
+  }
+  if (d.total === undefined) return; // 无工具模块权限
+  $('#k_total').textContent = d.total; $('#k_in').textContent = d.instock;
+  $('#k_out').textContent = d.borrowed; $('#k_fix').textContent = d.repairing;
+  $('#k_dead').textContent = d.scrapped;
+  if (d.overdue.length) {
+    $('#overdueCard').style.display = 'block';
+    $('#overdueBody').innerHTML = d.overdue.map(r => `<tr>
+      <td><b>${e(r.tool_code)}</b></td><td>${e(r.tool_name || '')}</td><td>${e(r.borrower)}</td>
+      <td>${e(r.borrower_dept)}</td><td>${r.borrow_time}</td>
+      <td style="color:var(--red);font-weight:600">${r.expect_return}</td>
+      <td><a class="btn sm orange" href="borrow.html">去处理</a></td></tr>`).join('');
+  }
+  if (d.lowStock.length) {
+    $('#lowCard').style.display = 'block';
+    $('#lowBody').innerHTML = d.lowStock.map(r => `<tr>
+      <td><b>${e(r.code)}</b></td><td>${e(r.name)}</td>
+      <td style="color:var(--red);font-weight:700">${r.qty}</td><td>${r.min_stock}</td></tr>`).join('');
+  }
+  if (d.maintDue.length) {
+    $('#maintCard').style.display = 'block';
+    $('#maintBody').innerHTML = d.maintDue.map(r => `<tr>
+      <td><b>${e(r.code)}</b></td><td>${e(r.name)}</td><td>${r.maint_cycle}</td><td>${r.last_maint || '从未保养'}</td></tr>`).join('');
+  }
+  // 工具库存看板：4 个排行
+  if (d.topStock) {
+    $('#topStockBody').innerHTML = d.topStock.length
+      ? d.topStock.map((r, i) => `<tr><td>${i + 1}</td><td><b>${e(r.code)}</b></td><td>${e(r.name)}</td><td>${e(r.category)}</td><td class="num">${r.qty}</td></tr>`).join('')
+      : '<tr><td colspan="5" class="empty-tip">暂无数据</td></tr>';
+  }
+  if (d.lowStock3) {
+    $('#lowStock3Body').innerHTML = d.lowStock3.length
+      ? d.lowStock3.map((r, i) => `<tr><td>${i + 1}</td><td><b>${e(r.code)}</b></td><td>${e(r.name)}</td><td>${e(r.category)}</td><td class="num" style="color:var(--red);font-weight:700">${r.qty}</td></tr>`).join('')
+      : '<tr><td colspan="5" class="empty-tip">暂无库存小于3的物料</td></tr>';
+  }
+  if (d.topBorrowers) {
+    $('#topBorrowersBody').innerHTML = d.topBorrowers.length
+      ? d.topBorrowers.map((r, i) => `<tr><td>${i + 1}</td><td><b>${e(r.borrower)}</b></td><td>${e(r.borrower_dept)}</td><td class="num">${r.c}</td></tr>`).join('')
+      : '<tr><td colspan="4" class="empty-tip">暂无借用记录</td></tr>';
+  }
+  if (d.topScrappers) {
+    $('#topScrappersBody').innerHTML = d.topScrappers.length
+      ? d.topScrappers.map((r, i) => `<tr><td>${i + 1}</td><td><b>${e(r.approver)}</b></td><td class="num">${r.c}</td></tr>`).join('')
+      : '<tr><td colspan="3" class="empty-tip">暂无报废记录</td></tr>';
+  }
+  if (d.recentIssues) {
+    $('#recentIssuesBody').innerHTML = d.recentIssues.length
+      ? d.recentIssues.map(r => `<tr>
+        <td>${e(r.issue_date)}</td><td><b>${e(r.tool_code)}</b></td><td>${e(r.tool_name)}</td>
+        <td>${e(r.issuer)}</td><td>${e(r.dept)}</td>
+        <td><span class="tag ${r.itype === '新领' ? 'in' : r.itype === '报废换新' ? 'fix' : 'out'}">${e(r.itype)}</span></td>
+        <td class="num">${r.qty}</td><td>${e(r.purpose)}</td></tr>`).join('')
+      : '<tr><td colspan="8" class="empty-tip">暂无领用记录</td></tr>';
+  }
+}
+async function backup() {
+  const r = await fetch('/api/backup', { headers: { 'X-Token': App.token } });
+  const blob = await r.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'backup-' + App.today() + '.db';
+  a.click();
+  App.toast('数据库备份已下载', 'ok');
+}
+load();
+</script>
+</body>
+</html>

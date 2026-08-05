@@ -1,0 +1,29 @@
+# ===== 运行时数据（含业务数据，禁止上传）=====
+data.db
+data.db-shm
+data.db-wal
+backups/
+*.log
+server.out.log
+server.err.log
+
+# ===== 临时 / 测试产物 =====
+.deploytest/
+_check_all.json
+_check_f.json
+
+# ===== 依赖（PPT 教程等独立工具）=====
+node_modules/
+ppt-tutorial/output/
+
+# ===== 部署包中的二进制与旧源码副本 =====
+# docs 下打包好的部署包含 nssm.exe、Node 安装包、源码镜像，体积大且重复，不进仓库
+docs/车间管理系统部署到WindowsServer/
+*.zip
+*.msi
+*.exe
+
+# ===== 系统 / 编辑器 =====
+.DS_Store
+Thumbs.db
+.vscode/

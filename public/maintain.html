@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>维修保养与报废管理</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container">
+
+  <div class="card need-write no-print">
+    <h2>维修 / 保养登记</h2>
+    <div class="form-row">
+      <div class="form-item"><label><b>*</b> 工具编号(可扫码)</label><input id="m_code" placeholder="如 DZ-001"></div>
+      <div class="form-item"><label>类型</label><select id="m_type"><option>维修</option><option>保养</option></select></div>
+      <div class="form-item"><label>送修/保养日期</label><input type="date" id="m_date"></div>
+      <div class="form-item"><label>费用(元)</label><input type="number" step="0.01" min="0" id="m_cost"></div>
+      <div class="form-item" style="flex:1"><label>故障原因/保养内容</label><input id="m_fault" style="width:100%"></div>
+      <button class="btn" style="align-self:end" onclick="addMaintain()">登记</button>
+    </div>
+  </div>
+
+  <div class="card need-write no-print">
+    <h2>报废登记（从在册库存中移除）</h2>
+    <div class="form-row">
+      <div class="form-item"><label><b>*</b> 工具编号(可扫码)</label><input id="s_code" placeholder="如 DZ-001"></div>
+      <div class="form-item"><label>报废日期</label><input type="date" id="s_date"></div>
+      <div class="form-item"><label><b>*</b> 批准人</label><input id="s_approver"></div>
+      <div class="form-item" style="flex:1"><label>报废原因</label><input id="s_reason" style="width:100%"></div>
+      <button class="btn red" style="align-self:end" onclick="addScrap()">报废</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 class="no-print">维修保养记录</h2>
+    <div class="toolbar no-print">
+      <div class="form-item"><label>状态</label>
+        <select id="q_status"><option value="">全部</option><option>进行中</option><option>已完成</option></select></div>
+      <div class="form-item"><label>工具</label><input id="q_tool" placeholder="编号或名称"></div>
+      <button class="btn" onclick="loadM()">🔍 查询</button>
+      <span class="spacer"></span>
+      <button class="btn ghost" onclick="exportM()">📤 导出Excel</button>
+      <button class="btn ghost" onclick="App.print('工具维修保养记录表','')">🖨️ 打印</button>
+    </div>
+    <div class="print-header"></div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>序号</th><th>工具编号</th><th>工具名称</th><th>类型</th><th>送修/保养日期</th>
+        <th>故障原因/内容</th><th>费用(元)</th><th>完成日期</th><th>状态</th><th class="actions-col need-write">操作</th></tr></thead>
+        <tbody id="mBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 class="no-print">报废记录</h2>
+    <div class="toolbar no-print">
+      <span class="spacer"></span>
+      <button class="btn ghost" onclick="exportS()">📤 导出Excel</button>
+    </div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>序号</th><th>工具编号</th><th>工具名称</th><th>报废日期</th><th>报废原因</th><th>批准人</th></tr></thead>
+        <tbody id="sBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 完成维修弹窗 -->
+<div class="modal-mask" id="finMask" style="display:none">
+  <div class="modal" style="max-width:420px">
+    <h3>完成维修/保养</h3>
+    <div class="form-row">
+      <div class="form-item"><label>完成日期</label><input type="date" id="f_date"></div>
+      <div class="form-item"><label>最终费用(元)</label><input type="number" step="0.01" id="f_cost"></div>
+    </div>
+    <div class="actions">
+      <button class="btn ghost" onclick="$('#finMask').style.display='none'">取消</button>
+      <button class="btn green" onclick="doFinish()">确认完成（工具回到在库）</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/vendor/xlsx.full.min.js"></script>
+<script src="js/app.js"></script>
+<script>
+App.nav('maintain.html');
+let mRows = [], sRows = [], finId = null;
+
+async function addMaintain() {
+  if (!$('#m_code').value.trim()) return App.toast('请填写工具编号', 'err');
+  await App.post('/api/maintains', {
+    tool_code: $('#m_code').value.trim(), mtype: $('#m_type').value,
+    send_date: $('#m_date').value, fault: $('#m_fault').value.trim(), cost: $('#m_cost').value
+  });
+  App.toast('登记成功', 'ok');
+  ['m_code', 'm_fault', 'm_cost'].forEach(i => $('#' + i).value = '');
+  loadM();
+}
+async function addScrap() {
+  if (!$('#s_code').value.trim() || !$('#s_approver').value.trim()) return App.toast('工具编号和批准人必填', 'err');
+  if (!confirm('确认将工具 ' + $('#s_code').value + ' 报废？此操作会将其从在册库存移除。')) return;
+  await App.post('/api/scraps', {
+    tool_code: $('#s_code').value.trim(), scrap_date: $('#s_date').value,
+    reason: $('#s_reason').value.trim(), approver: $('#s_approver').value.trim()
+  });
+  App.toast('已报废', 'ok');
+  ['s_code', 's_reason', 's_approver'].forEach(i => $('#' + i).value = '');
+  loadS();
+}
+
+async function loadM() {
+  const p = new URLSearchParams();
+  if ($('#q_status').value) p.set('status', $('#q_status').value);
+  if ($('#q_tool').value.trim()) p.set('tool', $('#q_tool').value.trim());
+  mRows = await App.get('/api/maintains?' + p);
+  const e = App.escapeHtml;
+  $('#mBody').innerHTML = mRows.length ? mRows.map((r, i) => `<tr>
+    <td>${i + 1}</td><td><b>${e(r.tool_code)}</b></td><td>${e(r.tool_name || '')}</td>
+    <td>${r.mtype}</td><td>${r.send_date}</td><td>${e(r.fault)}</td>
+    <td class="num">${App.fmt(r.cost)}</td><td>${r.finish_date || '-'}</td>
+    <td><span class="tag ${r.status === '进行中' ? 'fix' : 'in'}">${r.status}</span></td>
+    <td class="actions-col need-write">${r.status === '进行中'
+      ? `<button class="btn sm green" onclick="openFinish(${r.id},${r.cost})">完成</button>` : ''}</td>
+    </tr>`).join('') : '<tr><td colspan="10" class="empty-tip">暂无记录</td></tr>';
+}
+function openFinish(id, cost) {
+  finId = id;
+  $('#f_date').value = App.today(); $('#f_cost').value = cost || '';
+  $('#finMask').style.display = 'flex';
+}
+async function doFinish() {
+  await App.post('/api/maintains/' + finId + '/finish', { finish_date: $('#f_date').value, cost: $('#f_cost').value });
+  $('#finMask').style.display = 'none';
+  App.toast('已完成，工具状态恢复在库', 'ok'); loadM();
+}
+
+async function loadS() {
+  sRows = await App.get('/api/scraps');
+  const e = App.escapeHtml;
+  $('#sBody').innerHTML = sRows.length ? sRows.map((r, i) => `<tr>
+    <td>${i + 1}</td><td><b>${e(r.tool_code)}</b></td><td>${e(r.tool_name)}</td>
+    <td>${r.scrap_date}</td><td>${e(r.reason)}</td><td>${e(r.approver)}</td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty-tip">暂无报废记录</td></tr>';
+}
+
+function exportM() {
+  if (!mRows.length) return App.toast('没有可导出的数据', 'err');
+  App.exportExcel('工具维修保养记录',
+    ['序号', '工具编号', '工具名称', '类型', '送修/保养日期', '故障原因/内容', '费用(元)', '完成日期', '状态'],
+    mRows.map((r, i) => [i + 1, r.tool_code, r.tool_name, r.mtype, r.send_date, r.fault, r.cost, r.finish_date, r.status]),
+    '维修保养');
+}
+function exportS() {
+  if (!sRows.length) return App.toast('没有可导出的数据', 'err');
+  App.exportExcel('工具报废记录',
+    ['序号', '工具编号', '工具名称', '报废日期', '报废原因', '批准人'],
+    sRows.map((r, i) => [i + 1, r.tool_code, r.tool_name, r.scrap_date, r.reason, r.approver]),
+    '报废记录');
+}
+$('#m_date').value = App.today(); $('#s_date').value = App.today();
+loadM(); loadS();
+</script>
+</body>
+</html>

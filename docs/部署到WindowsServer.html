@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>四福车间管理系统 · 部署到 Windows Server</title>
+<style>
+  :root{--blue:#1F3864;--blue2:#2E5496;--accent:#C00000;--green:#1E7B34;--orange:#C55A11;--gray:#5A6573;--bg:#F4F6FA;--line:#D9E0EA;--card:#fff}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;color:#222;background:var(--bg);line-height:1.7}
+  header{background:linear-gradient(120deg,var(--blue),var(--blue2));color:#fff;padding:30px 48px}
+  header h1{margin:0;font-size:24px}
+  header .sub{margin-top:6px;opacity:.9;font-size:14px}
+  main{max-width:980px;margin:0 auto;padding:26px 32px 60px}
+  section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px 28px;margin-bottom:22px;box-shadow:0 1px 3px rgba(20,40,80,.05)}
+  h2{color:var(--blue);border-left:5px solid var(--accent);padding-left:12px;font-size:20px;margin-top:4px}
+  h3{color:var(--blue2);margin:18px 0 6px;font-size:15.5px}
+  p{margin:9px 0}
+  ol,ul{margin:9px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{font-family:Consolas,monospace;background:#eef1f6;padding:2px 6px;border-radius:5px;font-size:12.5px;color:#B1361E}
+  .codebox{background:#0f1626;color:#e6edf3;padding:14px 16px;border-radius:8px;font-family:Consolas,monospace;font-size:12.5px;white-space:pre;overflow:auto;line-height:1.6}
+  .step{display:inline-block;background:var(--blue);color:#fff;width:24px;height:24px;border-radius:50%;text-align:center;line-height:24px;font-size:13px;font-weight:bold;margin-right:8px}
+  .tip,.warn,.ok{border-radius:8px;padding:12px 16px;margin:14px 0;font-size:13.5px}
+  .tip{background:#eaf3ff;border-left:4px solid var(--blue2)}
+  .warn{background:#fff3e6;border-left:4px solid var(--orange)}
+  .ok{background:#eaf6ec;border-left:4px solid var(--green)}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:#eef3fb;color:var(--blue);font-weight:600}
+  figure{margin:16px 0;text-align:center}
+  figcaption{color:var(--gray);font-size:12.5px;margin-top:6px}
+  svg{max-width:100%;height:auto}
+  .foot{text-align:center;color:var(--gray);font-size:12.5px;padding:20px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🖥️ 四福车间管理系统 · 部署到 Windows Server</h1>
+  <div class="sub">适用：Windows Server 2016 / 2019 / 2022（桌面体验或 Core 均可）</div>
+</header>
+<main>
+
+<section>
+  <h2>一、部署总览</h2>
+  <p>本系统为<b>绿色免安装</b>架构：只需一台装好 Node.js 的 Windows Server，把程序目录放好、启动服务、放行端口即可。数据全部在单个 <code>data.db</code> 文件里，备份/迁移只需复制该文件。</p>
+  <figure>
+    <svg viewBox="0 0 720 160" xmlns="http://www.w3.org/2000/svg" font-family="Microsoft YaHei,sans-serif">
+      <rect x="20" y="45" width="170" height="70" rx="10" fill="#EAF3FF" stroke="#2E5496"/>
+      <text x="105" y="75" text-anchor="middle" font-size="13" fill="#1F3864" font-weight="bold">车间电脑/手机</text>
+      <text x="105" y="95" text-anchor="middle" font-size="11" fill="#5A6573">浏览器</text>
+      <line x1="190" y1="80" x2="270" y2="80" stroke="#5A6573" stroke-width="2" marker-end="url(#ar)"/>
+      <rect x="275" y="35" width="190" height="90" rx="12" fill="#1F3864"/>
+      <text x="370" y="65" text-anchor="middle" font-size="14" fill="#fff" font-weight="bold">Windows Server</text>
+      <text x="370" y="86" text-anchor="middle" font-size="12" fill="#cfe0ff">Node.js 服务 :8090</text>
+      <text x="370" y="106" text-anchor="middle" font-size="11" fill="#cfe0ff">开机自启 + 防火墙放行</text>
+      <line x1="465" y1="80" x2="540" y2="80" stroke="#5A6573" stroke-width="2" marker-end="url(#ar)"/>
+      <rect x="545" y="45" width="155" height="70" rx="10" fill="#EAF6EC" stroke="#1E7B34"/>
+      <text x="622" y="75" text-anchor="middle" font-size="13" fill="#1E7B34" font-weight="bold">data.db</text>
+      <text x="622" y="95" text-anchor="middle" font-size="11" fill="#5A6573">单文件数据库</text>
+      <defs><marker id="ar" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#5A6573"/></marker></defs>
+    </svg>
+    <figcaption>图 1　Windows Server 部署拓扑</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>二、环境要求</h2>
+  <table>
+    <tr><th>项目</th><th>要求</th></tr>
+    <tr><td>操作系统</td><td>Windows Server 2016/2019/2022（x64）；桌面体验版或 Server Core 均可</td></tr>
+    <tr><td>Node.js</td><td><b>≥ 22 LTS</b>（必须，因使用内置 <code>node:sqlite</code>；23+ 已稳定，22 需 <code>--experimental-sqlite</code> 开关）</td></tr>
+    <tr><td>内存/磁盘</td><td>2 GB 内存、200 MB 磁盘即可；数据库随业务增长</td></tr>
+    <tr><td>网络</td><td>服务器与车间终端在同一局域网；需放行 TCP <b>8090</b> 端口</td></tr>
+    <tr><td>其他</td><td>无需安装数据库、无需联网；管理员权限用于放行防火墙 / 建服务</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>三、安装 Node.js</h2>
+  <p><span class="step">1</span>到官网 <code>https://nodejs.org</code> 下载 <b>LTS</b> 安装包（选 Windows Installer .msi，x64）。</p>
+  <p><span class="step">2</span>运行安装包，一路「Next」，务必勾选 <b>“Add to PATH”</b>（添加到环境变量）。</p>
+  <p><span class="step">3</span>安装完成后，打开「命令提示符」或 PowerShell 验证：</p>
+  <div class="codebox">node -v
+# 期望输出类似 v22.x.x 或 v24.x.x（≥ 22 即可）
+
+node -e "require('node:sqlite');console.log('sqlite OK')"
+# 若 Node 22 提示需开关，可忽略，启动脚本已加 --experimental-sqlite</div>
+  <div class="warn">若 <code>node -v</code> 提示“不是内部或外部命令”，说明 PATH 未生效——重新打开命令行，或手动将 Node 安装目录加入系统 PATH。</div>
+</section>
+
+<section>
+  <h2>四、部署程序文件</h2>
+  <p><span class="step">1</span>把整个 <code>factory-app</code> 文件夹复制到服务器，建议放在固定位置，例如：</p>
+  <div class="codebox">C:\Workshop\factory-app\        ← 程序目录（server.js / public / data 在此）</div>
+  <p><span class="step">2</span>确认目录下含：<code>server.js</code>、<code>public\</code>、<code>data\</code>、<code>start.bat</code>、<code>Dockerfile</code> 等。无需执行 <code>npm install</code>（无任何第三方依赖）。</p>
+  <div class="tip">如用于<b>全新部署</b>（非从开发机迁移），可删除根目录下的 <code>data.db</code>（如有），首次启动会自动建库并写入初始管理员账号。</div>
+  <p><span class="step">3</span>先手动启动一次，确认能跑起来：</p>
+  <div class="codebox">cd /d C:\Workshop\factory-app
+start.bat
+# 黑窗口出现 “本机访问: http://localhost:8090” 即成功
+# 浏览器访问 http://localhost:8090  ，用 admin / admin123 登录</div>
+  <div class="ok">验证通过后，<b>关闭该黑窗口</b>，进入下一步配置开机自启（避免依赖这个手动窗口）。</div>
+</section>
+
+<section>
+  <h2>五、配置开机自启（两种方式任选）</h2>
+
+  <h3>方式 A（推荐）：任务计划程序，开机自启、无需登录</h3>
+  <ol>
+    <li>「服务器管理器」→「工具」→「任务计划程序」；右侧「创建任务」。</li>
+    <li><b>常规</b>：名称填 <code>WorkshopSystem</code>；勾选 <b>“不管用户是否登录都要运行”</b> 与 <b>“使用最高权限运行”</b>；配置为 Windows Server 对应版本。</li>
+    <li><b>触发器</b>：新建 →「启动时」。</li>
+    <li><b>操作</b>：新建 → 程序/脚本填 <code>C:\Workshop\factory-app\start.bat</code>（也可直接填 node 绝对路径 + 参数，见下）。</li>
+    <li><b>条件</b>：取消“只有在计算机使用交流电源时才启动此任务”的勾选（避免断电恢复后不启动）。</li>
+    <li>确定并输入管理员密码；重启服务器验证是否自动起来。</li>
+  </ol>
+
+  <h3>方式 B：注册为 Windows 服务（用 nssm，更稳定、可看状态）</h3>
+  <p>下载 <code>nssm</code>（https://nssm.cc），解压得到 <code>nssm.exe</code>，执行：</p>
+  <div class="codebox">nssm install WorkshopSystem "C:\Workshop\factory-app\start.bat"
+nssm set WorkshopSystem AppDirectory "C:\Workshop\factory-app"
+nssm start WorkshopSystem</div>
+  <p>之后可在「服务」(services.msc) 里看到 <code>WorkshopSystem</code>，设为「自动」启动。</p>
+  <div class="tip">若直接以 <code>node</code> 注册服务，命令行参数为：<code>"C:\Program Files\nodejs\node.exe" --experimental-sqlite "C:\Workshop\factory-app\server.js"</code>（Node 24 可省略开关）。</div>
+</section>
+
+<section>
+  <h2>六、防火墙放行端口 8090</h2>
+  <p>以<b>管理员</b>身份打开 PowerShell，执行：</p>
+  <div class="codebox">New-NetFirewallRule -DisplayName "WorkshopSystem-8090" `
+  -Direction Inbound -Protocol TCP -LocalPort 8090 -Action Allow</div>
+  <p>若用「高级安全 Windows 防火墙」图形界面：入站规则 → 新建规则 → 端口 → TCP → 特定本地端口 <code>8090</code> → 允许连接 → 全勾选 → 命名 <code>WorkshopSystem-8090</code>。</p>
+  <div class="warn">仅本机访问（localhost）不需防火墙；但车间其他电脑/手机通过 IP 访问<b>必须</b>放行 8090 入站。</div>
+</section>
+
+<section>
+  <h2>七、访问与初始化</h2>
+  <ul>
+    <li><b>服务器本机</b>：浏览器打开 <code>http://localhost:8090</code></li>
+    <li><b>车间终端/手机</b>：浏览器打开 <code>http://&lt;服务器IP&gt;:8090</code>（服务器 IP 用 <code>ipconfig</code> 查 IPv4）</li>
+    <li><b>初始账号</b>：<code>admin / admin123</code>，登录后请立即到「用户管理」修改密码并新建各岗位账号。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>八、数据备份与恢复</h2>
+  <div class="ok"><b>自动备份（内置）</b>：服务运行后，系统<b>每天 15:00</b> 自动把数据库备份到程序目录 <code>backups\</code> 文件夹（保留最近 30 份），无需任何额外配置。</div>
+  <div class="ok" style="margin-top:8px"><b>手动备份</b>：管理员首页点「💾 备份数据库」下载 <code>backup-日期.db</code>；或在「用户管理 → 数据备份与恢复」点「下载当前备份」。也可直接复制程序目录下的 <code>data.db</code>（含 WAL 时一并复制 <code>data.db-wal / data.db-shm</code>）。</div>
+  <p><b>图形化恢复（推荐）</b>：管理员进入「用户管理 → 数据备份与恢复」，可上传 <code>.db</code> 文件一键恢复，或从自动备份列表中一键「恢复 / 下载 / 删除」；恢复前系统会先自动备份当前数据以便回退。</p>
+  <p><b>手工恢复</b>：先停服务，把备份改名为 <code>data.db</code> 覆盖原文件（建议同时覆盖 WAL/SHM），再启动服务。</p>
+  <div class="tip">若仍需额外异地备份，可用任务计划程序每日执行复制脚本（如 <code>copy.bat</code>）：</div>
+  <div class="codebox">@echo off
+set d=%date:~0,4%%date:~5,2%%date:~8,2%
+copy "C:\Workshop\factory-app\data.db" "D:\Backup\workshop-%d%.db"</div>
+</section>
+
+<section>
+  <h2>九、升级程序</h2>
+  <ol>
+    <li>停掉服务（任务计划/nssm 停止，或关黑窗口）。</li>
+    <li>用新版 <code>server.js</code>、<code>public\</code> 覆盖旧文件；<b>切勿覆盖</b> <code>data.db</code>（保留数据）。</li>
+    <li>重新启动服务。数据库结构变化已由程序自动迁移（启动时执行），无需手工改表。</li>
+  </ol>
+</section>
+
+<section>
+  <h2>十、常见问题排查</h2>
+  <table>
+    <tr><th>现象</th><th>排查</th></tr>
+    <tr><td>启动报 “node 不是命令”</td><td>Node 未加入 PATH；或改用 Node 绝对路径启动。</td></tr>
+    <tr><td>报错 node:sqlite 不存在</td><td>Node 版本过低（&lt;22）；升级到 22 LTS 以上，并确保带 <code>--experimental-sqlite</code>。</td></tr>
+    <tr><td>本机能开、别人打不开</td><td>防火墙未放行 8090，或对方用了 localhost（应改用服务器 IP）。</td></tr>
+    <tr><td>端口被占用</td><td>改端口：启动命令前加 <code>set PORT=9000</code>，或编辑 start.bat；客户端访问对应新端口。</td></tr>
+    <tr><td>重启后服务没起来</td><td>任务计划程序“不管用户是否登录”未勾选，或 nssm 服务未设“自动”。</td></tr>
+  </table>
+  <div class="foot">四福车间管理系统 v1.0.2 · 程序设计：吴灵华 · 配套《四福车间管理系统使用说明书》《部署到绿联 4600 NAS》</div>
+</section>
+
+</main>
+</body>
+</html>

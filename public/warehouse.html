@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>仓库铜线领用表</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container">
+
+  <!-- 录入 -->
+  <div class="card need-write no-print">
+    <h2>新增记录 —— 仓库管理员填写（铜线领出 / 回库 / 报废）</h2>
+    <div class="form-row">
+      <div class="form-item"><label><b>*</b> 日期</label><input type="date" id="f_date"></div>
+      <div class="form-item" style="min-width:200px"><label>生产任务单号</label><input id="f_task" placeholder="如 RW20260728-01"></div>
+      <span style="color:var(--muted);font-size:12.5px;align-self:flex-end">一个任务单可登记多种线径规格，点“＋ 增加线径”逐条添加。</span>
+    </div>
+    <h3 style="margin-top:8px">线径明细（一个任务单可添加多种线径规格）</h3>
+    <div class="table-wrap">
+      <table class="data line-table" id="lineTable">
+        <thead><tr>
+          <th style="width:40px">#</th>
+          <th>线径规格 *</th>
+          <th style="width:120px">领出重量(kg)</th>
+          <th style="width:120px">回库重量(kg)</th>
+          <th style="width:120px">报废重量·线头(kg)</th>
+          <th style="width:110px">实际用量(kg)</th>
+          <th>备注</th>
+          <th style="width:50px">删行</th>
+        </tr></thead>
+        <tbody id="lineBody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:10px;align-items:center">
+      <button class="btn ghost sm" onclick="addLine()">＋ 增加线径</button>
+      <span style="color:var(--muted);font-size:12.5px">实际用量 = 领出 − 回库 − 线头报废。</span>
+      <span class="spacer" style="flex:1"></span>
+      <button class="btn green" onclick="save()">💾 保存全部</button>
+    </div>
+  </div>
+
+  <!-- 查询 -->
+  <div class="card">
+    <div class="toolbar no-print">
+      <div class="form-item"><label>开始日期</label><input type="date" id="q_from"></div>
+      <div class="form-item"><label>结束日期</label><input type="date" id="q_to"></div>
+      <div class="form-item"><label>任务单号</label><input id="q_task" placeholder="模糊查询"></div>
+      <div class="form-item"><label>规格</label><input id="q_spec" placeholder="模糊查询"></div>
+      <button class="btn" onclick="load()">🔍 查询</button>
+      <button class="btn ghost" onclick="resetQuery()">重置</button>
+      <span class="spacer"></span>
+      <button class="btn ghost" onclick="doExport()">📤 导出Excel</button>
+      <button class="btn ghost" onclick="doPrint()">🖨️ 打印</button>
+    </div>
+
+    <div class="print-header"></div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>
+          <th>序号</th><th>日期</th><th>生产任务单号</th><th>线径规格</th>
+          <th>领出重量(kg)</th><th>回库重量(kg)</th>
+          <th>报废重量·线头(kg)</th><th>实际用量(kg)</th><th>备注</th><th>填写人</th>
+          <th class="actions-col need-write">操作</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+        <tfoot id="tfoot"></tfoot>
+      </table>
+    </div>
+    <div class="print-sign">
+      <span>仓库管理员：＿＿＿＿＿＿</span><span>复核：＿＿＿＿＿＿</span><span>主管：＿＿＿＿＿＿</span>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑弹窗 -->
+<div class="modal-mask" id="editMask" style="display:none">
+  <div class="modal">
+    <h3>编辑记录</h3>
+    <div class="form-row">
+      <div class="form-item"><label>日期</label><input type="date" id="e_date"></div>
+      <div class="form-item"><label>生产任务单号</label><input id="e_task"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-item"><label>线径规格</label><input id="e_spec" class="spec-ac-input" autocomplete="off" placeholder="输入规格模糊筛选"></div>
+      <div class="form-item"><label>领出(kg)</label><input type="number" step="0.0001" id="e_out"></div>
+      <div class="form-item"><label>回库(kg)</label><input type="number" step="0.0001" id="e_ret"></div>
+      <div class="form-item"><label>线头报废(kg)</label><input type="number" step="0.0001" id="e_scrap"></div>
+    </div>
+    <div class="form-row"><div class="form-item" style="flex:1"><label>备注</label><input id="e_remark" style="width:100%"></div></div>
+    <div class="actions">
+      <button class="btn ghost" onclick="$('#editMask').style.display='none'">取消</button>
+      <button class="btn" onclick="saveEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/vendor/xlsx.full.min.js"></script>
+<script src="js/app.js"></script>
+<script src="js/wire-specs.js"></script>
+<script src="js/spec-ac.js"></script>
+<datalist id="specList"></datalist>
+<script>
+App.nav('warehouse.html');
+let rows = [], editId = null;
+
+/* 铜线规格：从服务器加载，前端用模糊选择组件（js/spec-ac.js）输入即筛、键盘快选 */
+let SPECS = [];
+async function loadSpecs() { try { SPECS = window.SPECS = await App.get('/api/copper-specs'); } catch (e) { SPECS = []; } }
+
+/* ===== 线径明细行 ===== */
+function addLine(spec) {
+  const tb = $('#lineBody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td class="idx">${tb.children.length + 1}</td>
+    <td><input class="l_spec spec-ac-input" required autocomplete="off" placeholder="输入规格模糊筛选"></td>
+    <td><input class="l_out" type="number" step="0.0001" min="0" oninput="calcUsed(this)"></td>
+    <td><input class="l_ret" type="number" step="0.0001" min="0" oninput="calcUsed(this)"></td>
+    <td><input class="l_scrap" type="number" step="0.0001" min="0" oninput="calcUsed(this)"></td>
+    <td class="num l_used">0.0000</td>
+    <td><input class="l_remark"></td>
+    <td><button class="btn sm red" onclick="delLine(this)">删</button></td>`;
+  tb.appendChild(tr);
+  SpecAC.init(tr.querySelector('.l_spec'));
+}
+function delLine(btn) { btn.closest('tr').remove(); renum(); }
+function renum() { $('#lineBody').querySelectorAll('tr').forEach((tr, i) => tr.querySelector('.idx').textContent = i + 1); }
+function calcUsed(inp) {
+  const tr = inp.closest('tr');
+  const o = parseFloat(tr.querySelector('.l_out').value) || 0;
+  const r = parseFloat(tr.querySelector('.l_ret').value) || 0;
+  const s = parseFloat(tr.querySelector('.l_scrap').value) || 0;
+  tr.querySelector('.l_used').textContent = (o - r - s).toFixed(4);
+}
+
+async function save() {
+  const date = $('#f_date').value;
+  const task = $('#f_task').value.trim();
+  if (!date) return App.toast('请填写日期', 'err');
+  const lines = [...$('#lineBody').querySelectorAll('tr')];
+  if (!lines.length) return App.toast('请至少添加一条线径明细', 'err');
+  const items = [];
+  for (const tr of lines) {
+    const spec = tr.querySelector('.l_spec').value.trim();
+    if (!spec) return App.toast('线径规格不能为空', 'err');
+    if (!SpecAC.isValid(spec)) return App.toast('请从下拉列表中选择有效的规格型号', 'err');
+    items.push({
+      rec_date: date, task_no: task,
+      wire_spec: spec,
+      out_weight: tr.querySelector('.l_out').value,
+      return_weight: tr.querySelector('.l_ret').value,
+      scrap_weight: tr.querySelector('.l_scrap').value,
+      remark: tr.querySelector('.l_remark').value.trim()
+    });
+  }
+  await App.post('/api/warehouse', { items });
+  App.toast('保存成功（' + items.length + ' 条）', 'ok');
+  $('#f_task').value = '';
+  $('#lineBody').innerHTML = '';
+  addLine();
+  load();
+}
+
+async function load() {
+  const p = new URLSearchParams();
+  if ($('#q_from').value) p.set('from', $('#q_from').value);
+  if ($('#q_to').value) p.set('to', $('#q_to').value);
+  if ($('#q_task').value.trim()) p.set('task', $('#q_task').value.trim());
+  if ($('#q_spec').value.trim()) p.set('spec', $('#q_spec').value.trim());
+  rows = await App.get('/api/warehouse?' + p);
+  const tb = $('#tbody'), e = App.escapeHtml;
+  if (!rows.length) { tb.innerHTML = '<tr><td colspan="11" class="empty-tip">暂无数据</td></tr>'; $('#tfoot').innerHTML = ''; return; }
+  tb.innerHTML = rows.map((r, i) => {
+    const used = r.out_weight - r.return_weight - r.scrap_weight;
+    return `<tr>
+    <td>${i + 1}</td><td>${r.rec_date}</td><td>${e(r.task_no)}</td><td>${e(r.wire_spec)}</td>
+    <td class="num">${App.fmt(r.out_weight)}</td><td class="num">${App.fmt(r.return_weight)}</td>
+    <td class="num">${App.fmt(r.scrap_weight)}</td><td class="num"><b>${used.toFixed(4)}</b></td>
+    <td>${e(r.remark)}</td><td>${e(r.created_by)}</td>
+    <td class="actions-col need-write">
+      <button class="btn sm ghost" onclick="openEdit(${r.id})">编辑</button>
+      <button class="btn sm red" onclick="delRow(${r.id})">删除</button>
+    </td></tr>`;
+  }).join('');
+  const s = rows.reduce((a, r) => {
+    a.o += r.out_weight; a.r += r.return_weight; a.s += r.scrap_weight; return a;
+  }, { o: 0, r: 0, s: 0 });
+  $('#tfoot').innerHTML = `<tr><td colspan="4">合计（${rows.length} 条）</td>
+    <td class="num">${s.o.toFixed(4)}</td><td class="num">${s.r.toFixed(4)}</td><td class="num">${s.s.toFixed(4)}</td>
+    <td class="num">${(s.o - s.r - s.s).toFixed(4)}</td><td colspan="2"></td>
+    <td class="actions-col need-write"></td></tr>`;
+}
+function resetQuery() { ['#q_from', '#q_to', '#q_task', '#q_spec'].forEach(s => $(s).value = ''); load(); }
+
+function openEdit(id) {
+  const r = rows.find(x => x.id === id); if (!r) return;
+  editId = id;
+  $('#e_date').value = r.rec_date; $('#e_task').value = r.task_no;
+  $('#e_spec').value = r.wire_spec; SpecAC.init($('#e_spec'));
+  $('#e_out').value = r.out_weight; $('#e_ret').value = r.return_weight;
+  $('#e_scrap').value = r.scrap_weight; $('#e_remark').value = r.remark;
+  $('#editMask').style.display = 'flex';
+}
+async function saveEdit() {
+  await App.put('/api/warehouse/' + editId, {
+    rec_date: $('#e_date').value, task_no: $('#e_task').value.trim(), wire_spec: $('#e_spec').value,
+    out_weight: $('#e_out').value, return_weight: $('#e_ret').value,
+    scrap_weight: $('#e_scrap').value, remark: $('#e_remark').value
+  });
+  $('#editMask').style.display = 'none'; App.toast('已保存', 'ok'); load();
+}
+async function delRow(id) {
+  if (!confirm('确定删除该条记录？')) return;
+  await App.del('/api/warehouse/' + id); App.toast('已删除', 'ok'); load();
+}
+
+function doExport() {
+  if (!rows.length) return App.toast('没有可导出的数据', 'err');
+  const s = rows.reduce((a, r) => {
+    a.o += r.out_weight; a.r += r.return_weight; a.s += r.scrap_weight; return a;
+  }, { o: 0, r: 0, s: 0 });
+  const range = ($('#q_from').value || '') + ($('#q_from').value || $('#q_to').value ? ' 至 ' : '') + ($('#q_to').value || '');
+  const taskQ = $('#q_task').value.trim();
+  App.exportExcel('仓库铜线领用表',
+    ['序号', '日期', '生产任务单号', '线径规格', '领出重量(kg)', '回库重量(kg)', '报废重量-线头(kg)', '实际用量(kg)', '备注', '填写人'],
+    rows.map((r, i) => [i + 1, r.rec_date, r.task_no, r.wire_spec, +r.out_weight, +r.return_weight, +r.scrap_weight,
+      +(r.out_weight - r.return_weight - r.scrap_weight).toFixed(4), r.remark, r.created_by]),
+    '仓库铜线领用表', {
+      title: '仓库铜线领用表',
+      meta: (range ? '日期范围：' + range : '') + (taskQ ? '　任务单号：' + taskQ : ''),
+      numCols: [4, 5, 6, 7],
+      totals: ['合计（' + rows.length + ' 条）', '', '', '', +s.o.toFixed(4), +s.r.toFixed(4), +s.s.toFixed(4),
+        +(s.o - s.r - s.s).toFixed(4), '', ''],
+      sign: ['仓库管理员：', '复核：', '主管：']
+    });
+}
+function doPrint() {
+  const range = ($('#q_from').value || '') + ($('#q_from').value || $('#q_to').value ? ' 至 ' : '') + ($('#q_to').value || '');
+  const taskQ = $('#q_task').value.trim();
+  App.print('仓库铜线领用表', (range ? '日期范围：' + range : '') + (taskQ ? '　任务单号：' + taskQ : ''));
+}
+
+$('#f_date').value = App.today();
+(async () => { await loadSpecs(); addLine(); load(); })();
+</script>
+</body>
+</html>

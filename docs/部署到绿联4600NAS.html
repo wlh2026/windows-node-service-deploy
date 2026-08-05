@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>四福车间管理系统 · 部署到绿联 4600 NAS</title>
+<style>
+  :root{--blue:#1F3864;--blue2:#2E5496;--accent:#C00000;--green:#1E7B34;--orange:#C55A11;--gray:#5A6573;--bg:#F4F6FA;--line:#D9E0EA;--card:#fff}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;color:#222;background:var(--bg);line-height:1.7}
+  header{background:linear-gradient(120deg,var(--blue),var(--blue2));color:#fff;padding:30px 48px}
+  header h1{margin:0;font-size:24px}
+  header .sub{margin-top:6px;opacity:.9;font-size:14px}
+  main{max-width:980px;margin:0 auto;padding:26px 32px 60px}
+  section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px 28px;margin-bottom:22px;box-shadow:0 1px 3px rgba(20,40,80,.05)}
+  h2{color:var(--blue);border-left:5px solid var(--accent);padding-left:12px;font-size:20px;margin-top:4px}
+  h3{color:var(--blue2);margin:18px 0 6px;font-size:15.5px}
+  p{margin:9px 0}
+  ol,ul{margin:9px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{font-family:Consolas,monospace;background:#eef1f6;padding:2px 6px;border-radius:5px;font-size:12.5px;color:#B1361E}
+  .codebox{background:#0f1626;color:#e6edf3;padding:14px 16px;border-radius:8px;font-family:Consolas,monospace;font-size:12.5px;white-space:pre;overflow:auto;line-height:1.6}
+  .step{display:inline-block;background:var(--blue);color:#fff;width:24px;height:24px;border-radius:50%;text-align:center;line-height:24px;font-size:13px;font-weight:bold;margin-right:8px}
+  .tip,.warn,.ok{border-radius:8px;padding:12px 16px;margin:14px 0;font-size:13.5px}
+  .tip{background:#eaf3ff;border-left:4px solid var(--blue2)}
+  .warn{background:#fff3e6;border-left:4px solid var(--orange)}
+  .ok{background:#eaf6ec;border-left:4px solid var(--green)}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:#eef3fb;color:var(--blue);font-weight:600}
+  figure{margin:16px 0;text-align:center}
+  figcaption{color:var(--gray);font-size:12.5px;margin-top:6px}
+  svg{max-width:100%;height:auto}
+  .foot{text-align:center;color:var(--gray);font-size:12.5px;padding:20px}
+  .tabs{display:flex;gap:8px;margin:8px 0}
+  .tabs span{background:#eef3fb;color:var(--blue2);border:1px solid var(--line);border-radius:6px;padding:4px 12px;font-size:12.5px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🗄️ 四福车间管理系统 · 部署到绿联 4600 NAS</h1>
+  <div class="sub">适用：绿联 DX4600 / 4600 系列（UGOS，Intel N5105 x86_64，支持 Docker）</div>
+</header>
+<main>
+
+<section>
+  <h2>一、部署总览</h2>
+  <p>绿联 4600 是 x86 架构 NAS，可直接跑 Docker。<b>推荐用 Docker 部署</b>：进程隔离、数据挂在宿盘、开机自动重启、升级只换镜像。项目已附带 <code>Dockerfile</code> 与 <code>docker-compose.yml</code>，无需联网安装任何依赖。</p>
+  <figure>
+    <svg viewBox="0 0 720 160" xmlns="http://www.w3.org/2000/svg" font-family="Microsoft YaHei,sans-serif">
+      <rect x="20" y="45" width="170" height="70" rx="10" fill="#EAF3FF" stroke="#2E5496"/>
+      <text x="105" y="75" text-anchor="middle" font-size="13" fill="#1F3864" font-weight="bold">车间电脑/手机</text>
+      <text x="105" y="95" text-anchor="middle" font-size="11" fill="#5A6573">浏览器</text>
+      <line x1="190" y1="80" x2="270" y2="80" stroke="#5A6573" stroke-width="2" marker-end="url(#ar)"/>
+      <rect x="275" y="35" width="190" height="90" rx="12" fill="#1F3864"/>
+      <text x="370" y="62" text-anchor="middle" font-size="14" fill="#fff" font-weight="bold">绿联 4600 NAS</text>
+      <text x="370" y="83" text-anchor="middle" font-size="12" fill="#cfe0ff">Docker 容器 :8090</text>
+      <text x="370" y="103" text-anchor="middle" font-size="11" fill="#cfe0ff">数据卷 → 宿主磁盘</text>
+      <line x1="465" y1="80" x2="540" y2="80" stroke="#5A6573" stroke-width="2" marker-end="url(#ar)"/>
+      <rect x="545" y="45" width="155" height="70" rx="10" fill="#EAF6EC" stroke="#1E7B34"/>
+      <text x="622" y="75" text-anchor="middle" font-size="13" fill="#1E7B34" font-weight="bold">/data 卷</text>
+      <text x="622" y="95" text-anchor="middle" font-size="11" fill="#5A6573">data.db 持久化</text>
+      <defs><marker id="ar" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#5A6573"/></marker></defs>
+    </svg>
+    <figcaption>图 1　绿联 4600 NAS 部署拓扑</figcaption>
+  </figure>
+  <div class="tabs"><span>方式 A：Docker（推荐）</span><span>方式 B：直接安装 Node</span></div>
+</section>
+
+<section>
+  <h2>二、方式 A：Docker 部署（推荐）</h2>
+
+  <h3>2.1 准备工作</h3>
+  <ol>
+    <li>绿联「应用中心 / 应用仓库」中安装 <b>Docker</b>（容器）应用。</li>
+    <li>在 NAS「文件管理」中建一个共享目录，例如 <code>/volume1/workshop</code>，把项目文件放进去：<code>server.js</code>、<code>public/</code>、<code>data/</code>、<code>Dockerfile</code>、<code>docker-compose.yml</code>。</li>
+  </ol>
+  <div class="tip">最省事的做法：把整个 <code>factory-app</code> 文件夹传到 <code>/volume1/workshop/factory-app</code>，compose 文件里的相对路径 <code>./data</code> 会自动映射到该目录下的 data。</div>
+
+  <h3>2.2 用「Docker Compose」一键启动（图形界面）</h3>
+  <ol>
+    <li>打开绿联 <b>Docker</b> 应用 → <b>Compose（项目）</b> → 新建。</li>
+    <li>选择上面的 <code>factory-app</code> 目录，使用自带的 <code>docker-compose.yml</code>。</li>
+    <li>点「创建 / 启动」。系统会自动构建镜像并启动容器 <code>workshop-mgmt</code>。</li>
+  </ol>
+
+  <h3>2.3 用命令行启动（SSH / 终端）</h3>
+  <p>在 NAS 的 SSH 终端进入 <code>factory-app</code> 目录执行：</p>
+  <div class="codebox">cd /volume1/workshop/factory-app
+docker compose up -d --build
+# 查看日志
+docker logs -f workshop-mgmt</div>
+  <p>看到 <code>本机访问: http://localhost:8090</code> 即启动成功。</p>
+
+  <h3>2.4 关键配置说明（docker-compose.yml）</h3>
+  <div class="codebox">services:
+  workshop:
+    build: .
+    image: workshop-mgmt:1.0.2
+    container_name: workshop-mgmt
+    restart: unless-stopped        # 开机/崩溃自动重启
+    ports:
+      - "8090:8090"               # 左=NAS端口 右=容器端口
+    environment:
+      - PORT=8090
+      - DATA_DIR=/app/data
+    volumes:
+      - ./data:/app/data          # 数据持久化到宿主磁盘</div>
+  <ul>
+    <li><b>改端口</b>：把 <code>"8090:8090"</code> 左边改成想暴露的端口，例如 <code>"9000:8090"</code>，访问时用 9000。</li>
+    <li><b>数据持久化</b>：<code>./data:/app/data</code> 把容器里的 <code>/app/data</code>（含 data.db）映射到 NAS 磁盘，重装/升级容器数据不丢。</li>
+    <li><b>自动重启</b>：<code>restart: unless-stopped</code> 保证 NAS 重启后服务自动起来。</li>
+  </ul>
+  <div class="warn">⚠️ <b>DATA_DIR 必须是绝对路径</b>：docker-compose 中已固定为 <code>/app/data</code>（容器内绝对路径），请勿改成相对路径或省略盘符的写法（如 <code>/e/workshop/...</code>），否则在 Windows 环境下 node:sqlite 可能无法创建数据库、数据落到错误位置导致「重启即丢数据」。Windows 直接运行方式（方式 B）默认使用程序目录（<code>__dirname</code>，本身就是绝对路径），无需手动设置。</div>
+  <div class="ok">镜像基于 <code>node:22-bookworm-slim</code>，启动命令已带 <code>--experimental-sqlite</code>，无需任何额外设置。</div>
+</section>
+
+<section>
+  <h2>三、方式 B：直接安装 Node（不使用 Docker）</h2>
+  <p>若不想用 Docker，可在绿联 NAS 的终端（需开启 SSH）里直接运行 Node 服务：</p>
+  <div class="codebox"># 1) 安装 Node.js（以 nvm 或官方二进制为例，需 ≥ 22）
+#    下载 node 二进制解压到 /volume1/workshop/node，并加入 PATH
+
+# 2) 进入程序目录
+cd /volume1/workshop/factory-app
+
+# 3) 启动（Node 22 需开关；24 可省略）
+node --experimental-sqlite server.js
+
+# 4) 后台常驻（nohup，NAS 重启后需重新执行或配合开机脚本）
+nohup node --experimental-sqlite server.js > /volume1/workshop/workshop.log 2>&1 &</div>
+  <p>为保证 NAS 重启后自动运行，可把启动命令加入绿联「开机启动 / 自定义脚本」，或用其“计划任务”设定开机执行。</p>
+  <div class="warn">直接运行方式下，数据文件 <code>data.db</code> 在程序目录；务必定期备份该文件。推荐仍优先使用 Docker 以获自动重启与隔离。</div>
+</section>
+
+<section>
+  <h2>四、访问与端口映射</h2>
+  <ul>
+    <li><b>NAS 本机/同局域网</b>：浏览器打开 <code>http://&lt;NAS的IP&gt;:8090</code>（NAS IP 在绿联「控制中心 → 网络」查看）。</li>
+    <li><b>外网访问（可选）</b>：在绿联「反向代理 / 端口转发」中把 8090 暴露到公网，或配合 DDNS + HTTPS 使用。<span class="warn" style="display:inline-block;margin:0">生产数据建议仅限内网，外网务必加 HTTPS 与强密码。</span></li>
+    <li><b>初始账号</b>：<code>admin / admin123</code>，登录后请立即修改密码并新建岗位账号。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>五、数据备份与恢复</h2>
+  <div class="ok"><b>自动备份（内置）</b>：服务运行后，系统<b>每天 15:00</b> 自动把数据库备份到 <code>DATA_DIR/backups</code> 目录（Docker 方式即挂载卷里的 <code>./data/backups</code>，保留最近 30 份），无需任何额外配置。</div>
+  <div class="ok" style="margin-top:8px"><b>手动/图形化备份与恢复</b>：① 管理员在系统首页点「💾 备份数据库」下载，或在「用户管理 → 数据备份与恢复」上传 <code>.db</code> 一键恢复、从自动备份列表一键「恢复 / 下载 / 删除」；恢复前系统会先自动备份当前数据以便回退。② 也可直接复制 NAS 上挂载卷里的 <code>factory-app/data</code> 目录（含 data.db）。</div>
+  <p><b>手工恢复</b>：停掉容器（<code>docker compose down</code>），用备份覆盖 <code>./data/data.db</code>（建议同时覆盖 WAL/SHM），再 <code>docker compose up -d</code>。</p>
+</section>
+
+<section>
+  <h2>六、升级程序</h2>
+  <ol>
+    <li>用新版 <code>server.js</code> / <code>public/</code> 覆盖 <code>factory-app</code> 目录（保留 <code>data/</code>）。</li>
+    <li>Docker 方式：<code>docker compose up -d --build</code> 重新构建并启动；数据库自动迁移，无需手工改表。</li>
+  </ol>
+</section>
+
+<section>
+  <h2>七、常见问题排查</h2>
+  <table>
+    <tr><th>现象</th><th>排查</th></tr>
+    <tr><td>容器起不来 / 反复重启</td><td>看 <code>docker logs workshop-mgmt</code>；多半是数据卷权限问题——确保 <code>./data</code> 目录 NAS 可读写。</td></tr>
+    <tr><td>访问提示拒绝/超时</td><td>确认端口映射左边端口与访问端口一致；检查绿联防火墙/网络是否放行该端口。</td></tr>
+    <tr><td>数据丢失</td><td>确认 <code>volumes</code> 已正确挂载到宿盘；不要删除 <code>./data</code> 目录。</td></tr>
+    <tr><td>node:sqlite 报错</td><td>镜像已固定 node:22 + 开关；若自行换基础镜像，请用 ≥22 且带 <code>--experimental-sqlite</code>。</td></tr>
+    <tr><td>NAS 重启后没起来</td><td>确认 compose 文件含 <code>restart: unless-stopped</code>；绿联 Docker 需开启「开机自启容器」。</td></tr>
+  </table>
+  <div class="foot">四福车间管理系统 v1.0.2 · 程序设计：吴灵华 · 配套《四福车间管理系统使用说明书》《部署到 Windows Server》</div>
+</section>
+
+</main>
+</body>
+</html>

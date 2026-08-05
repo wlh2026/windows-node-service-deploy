@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>生产车间型号重量对比表</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container">
+
+  <!-- 录入 -->
+  <div class="card need-write no-print">
+    <h2>新增记录 —— 生产车间每日生产型号重量对比</h2>
+    <div class="form-row">
+      <div class="form-item"><label><b>*</b> 日期</label><input type="date" id="f_date"></div>
+      <div class="form-item"><label><b>*</b> 生产任务单号</label><input id="f_task" placeholder="如 RW20260728-01"></div>
+      <div class="form-item"><label>BOM号</label><input id="f_bom" placeholder="如 3.05.04.07.0006"></div>
+    </div>
+    <h3>漆包线规格明细（一个任务单可添加多种规格）</h3>
+    <div class="table-wrap">
+      <table class="data line-table" id="lineTable">
+        <thead><tr>
+          <th style="width:40px">#</th>
+          <th>铜线规格型号 *</th>
+          <th style="width:90px">类型</th>
+          <th class="col-main-die" style="width:100px">主线线模</th>
+          <th class="col-aux-die" style="width:100px">副线线模</th>
+          <th style="width:120px">BOM重量(kg)</th>
+          <th style="width:120px">实际重量(kg)</th>
+          <th style="width:100px">差重(kg)</th>
+          <th>备注</th>
+          <th style="width:50px">删行</th>
+        </tr></thead>
+        <tbody id="lineBody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:10px">
+      <button class="btn ghost sm" onclick="addLine()">＋ 添加一行规格</button>
+      <span class="spacer" style="flex:1"></span>
+      <button class="btn green" onclick="saveLines()">💾 保存全部</button>
+    </div>
+  </div>
+
+  <!-- 查询 -->
+  <div class="card">
+    <div class="toolbar no-print">
+      <div class="form-item"><label>开始日期</label><input type="date" id="q_from"></div>
+      <div class="form-item"><label>结束日期</label><input type="date" id="q_to"></div>
+      <div class="form-item"><label>任务单号</label><input id="q_task" placeholder="模糊查询"></div>
+      <div class="form-item"><label>BOM号</label><input id="q_bom" placeholder="模糊查询"></div>
+      <button class="btn" onclick="load()">🔍 查询</button>
+      <button class="btn ghost" onclick="resetQuery()">重置</button>
+      <span class="spacer"></span>
+      <button class="btn ghost" onclick="doExport()">📤 导出Excel</button>
+      <button class="btn ghost" onclick="doPrint()">🖨️ 打印</button>
+    </div>
+
+    <div class="print-header"></div>
+    <div class="scroll-hint no-print">👈 左右滑动查看更多列（共 14 列）👉</div>
+    <div class="table-wrap">
+      <table class="data" id="tbl">
+        <thead><tr>
+          <th style="width:48px">序号</th>
+          <th style="width:100px">日期</th>
+          <th style="width:140px">生产任务单号</th>
+          <th style="width:130px">BOM号</th>
+          <th style="width:70px">类型</th>
+          <th class="col-main-die" style="width:90px">主线线模</th>
+          <th class="col-aux-die" style="width:90px">副线线模</th>
+          <th style="width:160px">铜线规格型号</th>
+          <th style="width:100px">BOM重量(kg)</th>
+          <th style="width:100px">实际重量(kg)</th>
+          <th style="width:120px">差重(kg)</th>
+          <th>备注</th>
+          <th style="width:80px">录入人</th>
+          <th class="actions-col need-write" style="width:110px">操作</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+        <tfoot id="tfoot"></tfoot>
+      </table>
+    </div>
+    <div class="print-sign">
+      <span>制表人：＿＿＿＿＿＿</span><span>车间主任：＿＿＿＿＿＿</span><span>审核：＿＿＿＿＿＿</span>
+    </div>
+
+    <!-- BOM 汇总：每个BOM一行；同任务单内多线径先合计，跨任务单再取平均 -->
+    <h3 style="margin-top:18px">按 BOM 号汇总（同任务单内合计，跨任务单取平均）</h3>
+    <div class="table-wrap">
+      <table class="data" id="bomTbl">
+        <thead><tr>
+          <th>序号</th>
+          <th>BOM号</th>
+          <th>任务单数</th>
+          <th>BOM铜重平均值</th>
+          <th>实际重量平均值</th>
+          <th>差重平均值</th>
+          <th>结论</th>
+        </tr></thead>
+        <tbody id="bomBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<datalist id="specList"></datalist>
+
+<!-- 编辑弹窗 -->
+<div class="modal-mask" id="editMask" style="display:none">
+  <div class="modal">
+    <h3>编辑记录</h3>
+    <div class="form-row">
+      <div class="form-item"><label>日期</label><input type="date" id="e_date"></div>
+      <div class="form-item"><label>任务单号</label><input id="e_task"></div>
+      <div class="form-item"><label>BOM号</label><input id="e_bom"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-item"><label>类型</label>
+        <select id="e_motor" onchange="onEditMotorChange()">
+          <option value="">（不选）</option>
+          <option value="单相">单相（主线+副线）</option>
+          <option value="三相">三相（线模尺寸）</option>
+          <option value="永磁">永磁（线模尺寸）</option>
+        </select>
+      </div>
+      <div class="form-item" id="e_main_die_box"><label>主线线模</label><input id="e_main_die" placeholder="如 φ1.2"></div>
+      <div class="form-item" id="e_aux_die_box"><label>副线线模</label><input id="e_aux_die" placeholder="如 φ0.9"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-item" style="flex:2"><label>规格型号</label><input id="e_spec" class="spec-ac-input" autocomplete="off" placeholder="输入规格模糊筛选"></div>
+      <div class="form-item"><label>BOM重量(kg)</label><input type="number" step="0.0001" id="e_bw"></div>
+      <div class="form-item"><label>实际重量(kg)</label><input type="number" step="0.0001" id="e_aw"></div>
+    </div>
+    <div class="form-row"><div class="form-item" style="flex:1"><label>备注</label><input id="e_remark" style="width:100%"></div></div>
+    <div class="actions">
+      <button class="btn ghost" onclick="$('#editMask').style.display='none'">取消</button>
+      <button class="btn" onclick="saveEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/vendor/xlsx.full.min.js"></script>
+<script src="js/app.js"></script>
+<script src="js/wire-specs.js"></script>
+<script src="js/spec-ac.js"></script>
+<script>
+App.nav('production.html');
+let rows = [], editId = null;
+
+/* 铜线规格：从服务器加载，前端用模糊选择组件（js/spec-ac.js）输入即筛、键盘快选 */
+let SPECS = [];
+async function loadSpecs() { try { SPECS = window.SPECS = await App.get('/api/copper-specs'); } catch (e) { SPECS = []; } }
+
+/* 差重显示规则：|差重| >= 0.01kg(10g) 红色并提示需修改BOM；否则绿色 */
+const BOM_DIFF_LIMIT = 0.01;
+function prodDiffCell(v, withTip) {
+  const n = Number(v) || 0;
+  const warn = Math.abs(n) >= BOM_DIFF_LIMIT;
+  const cls = warn ? 'diff-warn' : 'diff-ok';
+  const tip = (warn && withTip) ? '<span class="bom-tip">需修改BOM</span>' : '';
+  return `<td class="num ${cls}">${n.toFixed(4)}${tip}</td>`;
+}
+
+/* 类型变化时控制录入明细行 + 编辑弹窗的"主线/副线"列显隐
+ * 单相：显示 2 列（主线+副线）
+ * 三相 / 永磁：显示 1 列（列标题统一为"线模尺寸"）
+ * 空：隐藏全部
+ *
+ * 查询结果表（#tbl）的线模尺寸列不在这里控制 —— 查询表使用自适应渲染
+ * （buildTblHeaders / buildRowDies），根据数据里实际出现的类型集合
+ * 决定表头与每行的 td 数，确保列对齐天然正确。
+ */
+function applyMotorColumns(scope, motorType) {
+  // 录入明细行：所有行始终显示 主线线模 + 副线线模 两列，
+  // 不再按 motor_type 隐藏任何一个 td —— table-layout:fixed 下
+  // display:none 的列会导致列宽坍缩、列位置偏移（视觉错位）。
+  // 业务含义：单相填主线+副线两列；三相/永磁同样填主线+副线两列。
+  $$('#lineBody tr').forEach(tr => {
+    const mainTd = tr.querySelector('.l_main_die');
+    const auxTd = tr.querySelector('.l_aux_die');
+    if (mainTd) mainTd.closest('td').style.display = '';
+    if (auxTd) auxTd.closest('td').style.display = '';
+  });
+
+  // 编辑弹窗：按弹窗当前 motor 值显隐（弹窗不受 table-layout:fixed 影响，可安全隐藏）
+  if (scope === 'edit' || scope === 'all') {
+    const sm = motorType === '单相' || motorType === '三相' || motorType === '永磁';
+    const sa = motorType === '三相' || motorType === '永磁' || motorType === '单相';
+    const mb = $('#e_main_die_box');
+    const ab = $('#e_aux_die_box');
+    if (mb) mb.style.display = sm ? '' : 'none';
+    if (ab) ab.style.display = sa ? '' : 'none';
+  }
+}
+
+/* ------ 查询结果表的自适应表头 / 数据行（核心：列对齐天然正确） ------
+ * 规则：表头与每行的 td 数严格匹配 —— 同一个数据集渲染出来的表格，
+ *       每一行的列数都一样（要么全 14 列，要么全 13 列），不再依赖 td 的 hide。
+ *
+ * 线模列展示规则（依据数据里"实际出现的类型"集合）：
+ *   - 全是 单相           → "主线线模" + "副线线模"（2 列）
+ *   - 含 三相 或 永磁      → "主线线模" + "副线线模"（2 列，单相填两列，其它只填第一列）
+ *   - 只有 三相 或 永磁    → "线模"（1 列）
+ *   - 全部为空（无类型）    → 保持原 14 列结构（主线+副线都为空占位）
+ *
+ * 每行 td 输出：
+ *   单相           → 主线 + 副线（2 个 td）
+ *   三相 / 永磁    → 线模（1 个 td）
+ *   空            → 主线 + 副线（2 个空 td，占位避免列错位）
+ */
+function detectMotors(rows) {
+  const set = new Set();
+  rows.forEach(r => { if (r.motor_type) set.add(r.motor_type); });
+  return set;
+}
+function buildTblHeaders(motors) {
+  const hasSingle = motors.has('单相');
+  const hasSingleCol = motors.has('三相') || motors.has('永磁');
+  const onlySingleCol = !hasSingle && hasSingleCol;
+  const hasAnyMotor = hasSingle || hasSingleCol;
+  // 线模尺寸列（与各列宽度一起统一定义，确保完整显示）
+  let dieHeaders;
+  if (onlySingleCol) {
+    dieHeaders = '<th class="col-main-die col-die" style="width:90px">线模</th>';
+  } else {
+    const mainLabel = (hasSingle || !hasSingleCol) ? '主线线模' : '线模';
+    dieHeaders = `<th class="col-main-die col-die" style="width:90px">${mainLabel}</th><th class="col-aux-die col-die" style="width:90px">副线线模</th>`;
+  }
+  // 类型列：只要数据里出现任何电机类型就显示
+  const motorHeader = hasAnyMotor ? '<th style="width:70px">类型</th>' : '';
+  return `<tr>
+      <th style="width:48px">序号</th>
+      <th style="width:100px">日期</th>
+      <th style="width:140px">生产任务单号</th>
+      <th style="width:130px">BOM号</th>
+      ${motorHeader}
+      ${dieHeaders}
+      <th style="width:160px">铜线规格型号</th>
+      <th style="width:100px">BOM重量(kg)</th>
+      <th style="width:100px">实际重量(kg)</th>
+      <th style="width:120px">差重(kg)</th>
+      <th>备注</th>
+      <th style="width:80px">录入人</th>
+      <th class="actions-col need-write" style="width:110px">操作</th>
+    </tr>`;
+}
+function buildRowDieCells(r, motors) {
+  const mt = r.motor_type || '';
+  const hasSingle = motors.has('单相');
+  const hasSingleCol = motors.has('三相') || motors.has('永磁');
+  const onlySingleCol = !hasSingle && hasSingleCol;
+  if (onlySingleCol) {
+    // 数据全为三相/永磁 —— 表头只有 1 列线模尺寸
+    if (mt === '三相' || mt === '永磁') {
+      return `<td>${App.escapeHtml(r.main_die_size || '')}</td>`;
+    }
+    return `<td></td>`; // 占位
+  }
+  // 其它情况（混合或全单相或全空）—— 表头 2 列
+  if (mt === '单相') {
+    return `<td>${App.escapeHtml(r.main_die_size || '')}</td><td>${App.escapeHtml(r.aux_die_size || '')}</td>`;
+  }
+  if (mt === '三相' || mt === '永磁') {
+    // 只填第一列（主线列），副线列空占位
+    return `<td>${App.escapeHtml(r.main_die_size || '')}</td><td></td>`;
+  }
+  return `<td></td><td></td>`;
+}
+function rowTotalCols(motors) {
+  // 返回该数据集对应的总列数（用于 tfoot colspan 计算）
+  const onlySingleCol = !motors.has('单相') && (motors.has('三相') || motors.has('永磁'));
+  const hasAnyMotor = motors.has('单相') || motors.has('三相') || motors.has('永磁');
+  // 基础列：序号 + 日期 + 任务 + BOM + (类型) + (1或2列线模) + 规格 + BOM重 + 实际 + 差重 + 备注 + 录入 + 操作
+  const dieCols = onlySingleCol ? 1 : 2;
+  const motorCols = hasAnyMotor ? 1 : 0;
+  return 4 + motorCols + dieCols + 7; // 4前置 + 7后置(规格/3重量/备注/录入/操作)
+}
+
+/* ------ 录入明细行 ------ */
+function addLine() {
+  const tb = $('#lineBody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td class="ln"></td>
+    <td><input class="l_spec spec-ac-input" required autocomplete="off" placeholder="输入规格模糊筛选"></td>
+    <td><select class="l_motor" onchange="applyMotorColumns('all', this.value)">
+        <option value="">（不选）</option>
+        <option value="单相">单相</option>
+        <option value="三相">三相</option>
+        <option value="永磁">永磁</option>
+      </select></td>
+    <td><input class="l_main_die" placeholder="主线线模"></td>
+    <td><input class="l_aux_die" placeholder="副线线模"></td>
+    <td><input class="l_bw" type="number" step="0.0001" min="0" placeholder="BOM重量" oninput="calcLine(this)"></td>
+    <td><input class="l_aw" type="number" step="0.0001" min="0" placeholder="实际重量" oninput="calcLine(this)"></td>
+    <td class="l_diff num diff-ok">0.0000</td>
+    <td><input class="l_remark"></td>
+    <td><button class="btn red sm" onclick="this.closest('tr').remove();renum()">✕</button></td>`;
+  tb.appendChild(tr); renum();
+  SpecAC.init(tr.querySelector('.l_spec'));
+  // 新行追加后，按页面当前所有行的类型重新计算表头与每行显隐
+  applyMotorColumns('all', '');
+}
+function renum() { $$('#lineBody .ln').forEach((td, i) => td.textContent = i + 1); }
+function calcLine(inp) {
+  const tr = inp.closest('tr');
+  const d = (parseFloat(tr.querySelector('.l_aw').value) || 0) - (parseFloat(tr.querySelector('.l_bw').value) || 0);
+  const td = tr.querySelector('.l_diff');
+  const warn = Math.abs(d) >= BOM_DIFF_LIMIT;
+  td.innerHTML = d.toFixed(4) + (warn ? '<span class="bom-tip">需修改BOM</span>' : '');
+  td.className = 'l_diff num ' + (warn ? 'diff-warn' : 'diff-ok');
+}
+async function saveLines() {
+  const rec_date = $('#f_date').value, task_no = $('#f_task').value.trim(), bom_no = $('#f_bom').value.trim();
+  if (!rec_date || !task_no) return App.toast('请填写日期和任务单号', 'err');
+  const items = [];
+  for (const tr of $$('#lineBody tr')) {
+    const spec = tr.querySelector('.l_spec').value.trim();
+    if (!spec) continue;
+    if (!SpecAC.isValid(spec)) return App.toast('第 ' + (items.length + 1) + ' 行规格型号无效，请从下拉列表选择', 'err');
+    items.push({
+      rec_date, task_no, bom_no,
+      motor_type: tr.querySelector('.l_motor').value,
+      main_die_size: tr.querySelector('.l_main_die').value.trim(),
+      aux_die_size: tr.querySelector('.l_aux_die').value.trim(),
+      wire_spec: spec,
+      bom_weight: tr.querySelector('.l_bw').value, actual_weight: tr.querySelector('.l_aw').value,
+      remark: tr.querySelector('.l_remark').value.trim()
+    });
+  }
+  if (!items.length) return App.toast('请至少填写一行规格明细', 'err');
+  await App.post('/api/production', { items });
+  App.toast('保存成功，共 ' + items.length + ' 条', 'ok');
+  $('#lineBody').innerHTML = ''; addLine();
+  load();
+}
+
+/* ------ 查询/渲染 ------ */
+async function load() {
+  const p = new URLSearchParams();
+  if ($('#q_from').value) p.set('from', $('#q_from').value);
+  if ($('#q_to').value) p.set('to', $('#q_to').value);
+  if ($('#q_task').value.trim()) p.set('task', $('#q_task').value.trim());
+  if ($('#q_bom').value.trim()) p.set('bom', $('#q_bom').value.trim());
+  rows = await App.get('/api/production?' + p);
+  const tb = $('#tbody');
+  renderBomSummary();
+
+  // 1) 检测数据集中实际出现的类型集合
+  const motors = detectMotors(rows);
+  const hasAnyMotor = motors.size > 0;
+
+  // 2) 重渲染 #tbl 表头（按数据集自适应）
+  $('#tbl thead').innerHTML = buildTblHeaders(motors);
+
+  if (!rows.length) {
+    tb.innerHTML = '<tr><td colspan="' + rowTotalCols(motors) + '" class="empty-tip">暂无数据</td></tr>';
+    $('#tfoot').innerHTML = ''; return;
+  }
+  const e = App.escapeHtml;
+  // 3) 重渲染 #tbl 数据行（每行 td 数与表头严格匹配 —— 列对齐天然正确）
+  tb.innerHTML = rows.map((r, i) => `<tr>
+    <td>${i + 1}</td>
+    <td>${r.rec_date}</td>
+    <td>${e(r.task_no)}</td>
+    <td>${e(r.bom_no)}</td>
+    ${hasAnyMotor ? `<td>${e(r.motor_type || '')}</td>` : ''}
+    ${buildRowDieCells(r, motors)}
+    <td>${e(r.wire_spec)}</td>
+    <td class="num">${App.fmt(r.bom_weight)}</td>
+    <td class="num">${App.fmt(r.actual_weight)}</td>
+    ${prodDiffCell(r.diff_weight, true)}
+    <td>${e(r.remark)}</td>
+    <td>${e(r.created_by)}</td>
+    <td class="actions-col need-write">
+      <button class="btn sm ghost" onclick="openEdit(${r.id})">编辑</button>
+      <button class="btn sm red" onclick="delRow(${r.id})">删除</button>
+    </td>
+  </tr>`).join('');
+
+  // 4) 合计行：colspan 按当前总列数自适应
+  const s = rows.reduce((a, r) => { a.b += r.bom_weight; a.a += r.actual_weight; a.d += r.diff_weight; return a; }, { b: 0, a: 0, d: 0 });
+  // 合计行要覆盖到 "铜线规格" 列（含）之前：4 前置列 + (1 类型?) + (1/2 线模) = 总列数 - 7（后置 7 列）
+  const totalCols = rowTotalCols(motors);
+  const preSpecCols = totalCols - 7;
+  $('#tfoot').innerHTML = `<tr>
+    <td colspan="${preSpecCols}">合计（${rows.length} 条）</td>
+    <td class="num">${s.b.toFixed(4)}</td>
+    <td class="num">${s.a.toFixed(4)}</td>
+    ${prodDiffCell(s.d, false)}
+    <td colspan="2"></td>
+    <td class="actions-col need-write"></td>
+  </tr>`;
+}
+function resetQuery() { ['#q_from', '#q_to', '#q_task', '#q_bom'].forEach(s => $(s).value = ''); load(); }
+
+/* ------ 相同BOM号自动汇总（两级聚合） ------
+ * 第1层：同一 BOM号 + 同一任务单号 下，不同线径（规格）先求合计（b/a/d 求和）
+ * 第2层：同一 BOM号 下，对不同任务单的合计值再取平均
+ * 即：同任务单内多线径 → 合计；同BOM跨任务单 → 平均
+ */
+function bomSummary() {
+  // 第1层：按 (BOM号, 任务单号) 分组，求每个任务单的合计
+  const taskMap = new Map();
+  rows.forEach(r => {
+    const bom = (r.bom_no || '').trim() || '（未填BOM号）';
+    const task = (r.task_no || '').trim() || '（未填任务单）';
+    const key = JSON.stringify([bom, task]); // 用数组序列化做键，避免 BOM/任务单值碰撞
+    if (!taskMap.has(key)) taskMap.set(key, { bom, task, b: 0, a: 0, d: 0, records: 0 });
+    const g = taskMap.get(key);
+    g.b += +r.bom_weight; g.a += +r.actual_weight; g.d += +r.diff_weight; g.records++;
+  });
+  // 第2层：按 BOM号 聚合，对每个任务单合计值取平均
+  const bomMap = new Map();
+  taskMap.forEach(g => {
+    const key = g.bom;
+    if (!bomMap.has(key)) bomMap.set(key, { bom: key, tasks: 0, b: 0, a: 0, d: 0, records: 0 });
+    const B = bomMap.get(key);
+    B.tasks++; B.b += g.b; B.a += g.a; B.d += g.d; B.records += g.records;
+  });
+  return [...bomMap.values()].map(B => ({
+    ...B,
+    n: B.tasks,                                   // 用于显示/平均的任务单数
+    avgB: B.tasks ? B.b / B.tasks : 0,             // 不同任务单合计后的平均（BOM铜重）
+    avgA: B.tasks ? B.a / B.tasks : 0,             // 实际重量平均
+    avgD: B.tasks ? B.d / B.tasks : 0              // 差重平均
+  }));
+}
+function renderBomSummary() {
+  const gs = bomSummary();
+  const e = App.escapeHtml;
+  $('#bomBody').innerHTML = gs.length ? gs.map((g, i) => {
+    const warn = Math.abs(g.avgD) >= BOM_DIFF_LIMIT;
+    return `<tr>
+      <td>${i + 1}</td>
+      <td>${e(g.bom)}</td>
+      <td class="num">${g.n}</td>
+      <td class="num">${g.avgB.toFixed(4)}</td>
+      <td class="num">${g.avgA.toFixed(4)}</td>
+      <td class="num ${warn ? 'diff-warn' : 'diff-ok'}">${g.avgD.toFixed(4)}${warn ? '<span class="bom-tip">需修改BOM</span>' : ''}</td>
+      <td>${warn ? '<span style="color:var(--red);font-weight:600">差重平均≥10g，建议修改BOM</span>' : '<span style="color:var(--green)">正常</span>'}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty-tip">暂无数据</td></tr>';
+}
+
+function onEditMotorChange() { applyMotorColumns('edit', $('#e_motor').value); }
+function openEdit(id) {
+  const r = rows.find(x => x.id === id); if (!r) return;
+  editId = id;
+  $('#e_date').value = r.rec_date; $('#e_task').value = r.task_no; $('#e_bom').value = r.bom_no;
+  $('#e_motor').value = r.motor_type || '';
+  $('#e_main_die').value = r.main_die_size || '';
+  $('#e_aux_die').value = r.aux_die_size || '';
+  onEditMotorChange();
+  $('#e_spec').value = r.wire_spec; SpecAC.init($('#e_spec')); $('#e_bw').value = r.bom_weight; $('#e_aw').value = r.actual_weight;
+  $('#e_remark').value = r.remark;
+  $('#editMask').style.display = 'flex';
+}
+async function saveEdit() {
+  await App.put('/api/production/' + editId, {
+    rec_date: $('#e_date').value, task_no: $('#e_task').value, bom_no: $('#e_bom').value,
+    motor_type: $('#e_motor').value,
+    main_die_size: $('#e_main_die').value,
+    aux_die_size: $('#e_aux_die').value,
+    wire_spec: $('#e_spec').value, bom_weight: $('#e_bw').value, actual_weight: $('#e_aw').value,
+    remark: $('#e_remark').value
+  });
+  $('#editMask').style.display = 'none'; App.toast('已保存', 'ok'); load();
+}
+async function delRow(id) {
+  if (!confirm('确定删除该条记录？')) return;
+  await App.del('/api/production/' + id); App.toast('已删除', 'ok'); load();
+}
+
+/* ------ 导出/打印 ------ */
+function doExport() {
+  if (!rows.length) return App.toast('没有可导出的数据', 'err');
+  const s = rows.reduce((a, r) => { a.b += r.bom_weight; a.a += r.actual_weight; a.d += r.diff_weight; return a; }, { b: 0, a: 0, d: 0 });
+  const range = ($('#q_from').value || '') + ($('#q_from').value || $('#q_to').value ? ' 至 ' : '') + ($('#q_to').value || '');
+  const bomQ = $('#q_bom').value.trim();
+  const gs = bomSummary();
+
+  // 与查询表完全一致的列结构（保证网页和导出对得上）
+  const motors = detectMotors(rows);
+  const hasAnyMotor = motors.size > 0;
+  const onlySingleCol = !motors.has('单相') && (motors.has('三相') || motors.has('永磁'));
+
+  const headers = ['序号', '日期', '生产任务单号', 'BOM号'];
+  if (hasAnyMotor) headers.push('类型');
+  if (onlySingleCol) {
+    headers.push('线模');
+  } else {
+    headers.push(motors.has('单相') ? '主线线模' : '主线线模');
+    headers.push('副线线模');
+  }
+  headers.push('铜线规格型号', 'BOM重量(kg)', '实际重量(kg)', '差重(kg)', '备注', '录入人');
+
+  const dataRows = rows.map((r, i) => {
+    const arr = [i + 1, r.rec_date, r.task_no, r.bom_no];
+    if (hasAnyMotor) arr.push(r.motor_type || '');
+    const mt = r.motor_type || '';
+    if (onlySingleCol) {
+      // 数据全是三相/永磁 → 1 列"线模尺寸"
+      arr.push((mt === '三相' || mt === '永磁') ? (r.main_die_size || '') : '');
+    } else {
+      // 其它情况（混合/全单相/全空）→ 2 列"主线+副线"
+      if (mt === '单相') {
+        arr.push(r.main_die_size || '', r.aux_die_size || '');
+      } else if (mt === '三相' || mt === '永磁') {
+        arr.push(r.main_die_size || '', '');
+      } else {
+        arr.push('', '');
+      }
+    }
+    arr.push(r.wire_spec, +r.bom_weight, +r.actual_weight, +r.diff_weight,
+      (Math.abs(r.diff_weight) >= BOM_DIFF_LIMIT ? '需修改BOM' + (r.remark ? '；' : '') : '') + (r.remark || ''),
+      r.created_by);
+    return arr;
+  });
+
+  // 数字列（重量列的索引需要根据表头动态计算）
+  const numColIdxs = [];
+  headers.forEach((h, i) => { if (/重量|差重/.test(h)) numColIdxs.push(i); });
+  const diffColIdx = headers.findIndex(h => h.startsWith('差重'));
+
+  App.exportExcel('生产车间型号重量对比表', headers, dataRows, '生产对比表', {
+    title: '生产车间每日生产型号重量对比表',
+    meta: (range ? '日期范围：' + range : '') + (bomQ ? '　BOM号：' + bomQ : ''),
+    numCols: numColIdxs,
+    colorCols: diffColIdx >= 0 ? { [diffColIdx]: v => Math.abs(Number(v) || 0) >= BOM_DIFF_LIMIT ? 'C00000' : '1E7B34' } : {},
+    totals: (() => {
+      const t = ['合计（' + rows.length + ' 条）', '', '', ''];
+      if (hasAnyMotor) t.push('');
+      const dieCount = onlySingleCol ? 1 : 2;
+      for (let i = 0; i < dieCount; i++) t.push('');
+      t.push('', +s.b.toFixed(4), +s.a.toFixed(4), +s.d.toFixed(4), '', '');
+      return t;
+    })(),
+    sign: ['制表人：', '车间主任：', '审核：'],
+    /* 第二个工作表：按BOM汇总，两级聚合（同任务单合计，跨任务单平均） */
+    extraSheets: [{
+      name: 'BOM汇总',
+      headers: ['序号', 'BOM号', '任务单数', 'BOM铜重平均值', '实际重量平均值', '差重平均值', '结论'],
+      rows: gs.map((g, i) => [i + 1, g.bom, g.n, +g.avgB.toFixed(4), +g.avgA.toFixed(4), +g.avgD.toFixed(4),
+        Math.abs(g.avgD) >= BOM_DIFF_LIMIT ? '差重平均≥10g，需修改BOM' : '正常']),
+      opts: {
+        title: '按 BOM 号汇总表（同任务单合计·跨任务单平均）',
+        meta: (range ? '日期范围：' + range : '') + (bomQ ? '　BOM号：' + bomQ : ''),
+        numCols: [3, 4, 5],
+        colorCols: {
+          5: v => Math.abs(Number(v) || 0) >= BOM_DIFF_LIMIT ? 'C00000' : '1E7B34',
+          6: v => String(v).includes('需修改BOM') ? 'C00000' : '1E7B34'
+        }
+      }
+    }]
+  });
+}
+function doPrint() {
+  const range = ($('#q_from').value || '') + ($('#q_from').value || $('#q_to').value ? ' 至 ' : '') + ($('#q_to').value || '');
+  App.print('生产车间每日生产型号重量对比表', range ? '日期范围：' + range : '');
+}
+
+$('#f_date').value = App.today();
+(async () => { await loadSpecs(); addLine(); addLine(); load(); })();
+</script>
+</body>
+</html>

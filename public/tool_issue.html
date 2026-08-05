@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>小型工具领用表</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.form-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.form-item { display: flex; flex-direction: column; gap: 4px; min-width: 150px; flex: 1; }
+.form-item label { font-size: 13px; color: var(--muted); }
+.form-item input, .form-item select { padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; }
+.itype-tag { padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+.itype-新领 { background: #e6f4ea; color: #1e7b34; }
+.itype-报废换新 { background: #fdecea; color: #c0392b; }
+.itype-维修调换 { background: #eaf1fb; color: #2f6fed; }
+/* 编辑弹窗 */
+#editMask { position: fixed; inset: 0; background: rgba(20,30,45,.45); display: none; align-items: center; justify-content: center; z-index: 50; }
+#editMask .modal { background: #fff; border-radius: 14px; padding: 22px 24px; width: min(720px, 94vw); max-height: 90vh; overflow: auto; box-shadow: 0 16px 50px rgba(0,0,0,.25); }
+#editMask h3 { margin: 0 0 14px; color: var(--primary); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- 录入区 -->
+  <div class="card need-write no-print">
+    <h2>新增领用记录 —— 仓库管理员 / 工具管理员填写</h2>
+    <div class="form-row">
+      <div class="form-item"><label><b>*</b> 领用日期</label><input type="date" id="f_date"></div>
+      <div class="form-item"><label>工具编号</label><input id="f_code" placeholder="如 DZ-001（可选）"></div>
+      <div class="form-item"><label>工具名称</label><input id="f_name" placeholder="如 电钻（可选）"></div>
+    </div>
+    <div class="form-row" style="margin-top:10px">
+      <div class="form-item"><label><b>*</b> 领用人</label><input id="f_issuer" placeholder="领用人姓名"></div>
+      <div class="form-item"><label>班组 / 部门</label><input id="f_dept" placeholder="如 装配一班"></div>
+      <div class="form-item"><label><b>*</b> 领用类型</label>
+        <select id="f_itype">
+          <option value="新领">新领</option>
+          <option value="报废换新">报废换新</option>
+          <option value="维修调换">维修调换</option>
+        </select>
+      </div>
+      <div class="form-item" style="max-width:120px"><label>数量</label><input type="number" id="f_qty" min="1" value="1"></div>
+    </div>
+    <div class="form-row" style="margin-top:10px">
+      <div class="form-item"><label>用途 / 工单号</label><input id="f_purpose" placeholder="用途或工单号"></div>
+      <div class="form-item" style="flex:2"><label>备注</label><input id="f_remark" placeholder="备注说明"></div>
+    </div>
+    <div style="margin-top:14px">
+      <button class="btn green" onclick="save()">✔ 保存领用记录</button>
+      <button class="btn ghost" onclick="resetForm()">清空</button>
+    </div>
+  </div>
+
+  <!-- 查询 + 列表 -->
+  <div class="card">
+    <div class="toolbar no-print">
+      <div class="form-item"><label>领用类型</label>
+        <select id="q_itype"><option value="">全部</option><option>新领</option><option>报废换新</option><option>维修调换</option></select></div>
+      <div class="form-item"><label>领用人</label><input id="q_issuer" placeholder="领用人"></div>
+      <div class="form-item"><label>工具</label><input id="q_tool" placeholder="编号或名称"></div>
+      <div class="form-item"><label>日期从</label><input type="date" id="q_from"></div>
+      <div class="form-item"><label>到</label><input type="date" id="q_to"></div>
+      <button class="btn" onclick="load()">🔍 查询</button>
+      <span class="spacer"></span>
+      <button class="btn ghost" onclick="doExport()">📤 导出Excel</button>
+      <button class="btn ghost" onclick="App.print('小型工具领用表','')">🖨️ 打印</button>
+    </div>
+    <div class="print-header"></div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>
+          <th>序号</th><th>领用日期</th><th>工具编号</th><th>工具名称</th><th>领用人</th>
+          <th>班组/部门</th><th>领用类型</th><th>数量</th><th>用途/工单号</th><th>备注</th>
+          <th>录入人</th><th class="actions-col need-write">操作</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑弹窗 -->
+<div id="editMask">
+  <div class="modal">
+    <h3>编辑领用记录</h3>
+    <input type="hidden" id="e_id">
+    <div class="form-row">
+      <div class="form-item"><label>领用日期</label><input type="date" id="e_date"></div>
+      <div class="form-item"><label>工具编号</label><input id="e_code"></div>
+      <div class="form-item"><label>工具名称</label><input id="e_name"></div>
+    </div>
+    <div class="form-row" style="margin-top:10px">
+      <div class="form-item"><label>领用人</label><input id="e_issuer"></div>
+      <div class="form-item"><label>班组/部门</label><input id="e_dept"></div>
+      <div class="form-item"><label>领用类型</label>
+        <select id="e_itype">
+          <option value="新领">新领</option>
+          <option value="报废换新">报废换新</option>
+          <option value="维修调换">维修调换</option>
+        </select>
+      </div>
+      <div class="form-item" style="max-width:120px"><label>数量</label><input type="number" id="e_qty" min="1"></div>
+    </div>
+    <div class="form-row" style="margin-top:10px">
+      <div class="form-item"><label>用途/工单号</label><input id="e_purpose"></div>
+      <div class="form-item" style="flex:2"><label>备注</label><input id="e_remark"></div>
+    </div>
+    <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end">
+      <button class="btn green" onclick="saveEdit()">✔ 保存</button>
+      <button class="btn ghost" onclick="closeEdit()">取消</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/vendor/xlsx.full.min.js"></script>
+<script src="js/app.js"></script>
+<script src="js/pair-ac.js"></script>
+<script>
+App.nav('tool_issue.html');
+let rows = [];
+
+$('#f_date').value = App.today();
+
+// 加载工具档案，供「编号 ↔ 名称」双向模糊联动选择
+let toolItems = [];
+async function loadTools() {
+  try {
+    const arr = await App.get('/api/tools?limit=2000');
+    const list = (arr || [])
+      .map(t => ({ code: t.code || '', name: t.name || '' }))
+      .filter(t => t.code || t.name);
+    toolItems.length = 0; toolItems.push(...list);   // 原地修改，保持 PairAC 引用有效
+    if (!$('#f_code')._pairAC) PairAC.init($('#f_code'), $('#f_name'), toolItems);
+    else PairAC.setItems($('#f_code'), $('#f_name'), toolItems);
+    if (!$('#e_code')._pairAC) PairAC.init($('#e_code'), $('#e_name'), toolItems);
+    else PairAC.setItems($('#e_code'), $('#e_name'), toolItems);
+  } catch (e) { console.warn('工具列表加载失败', e); }
+}
+loadTools();
+
+function collect() {
+  const itype = $('#f_itype').value;
+  const issuer = $('#f_issuer').value.trim();
+  if (!$('#f_date').value) return App.toast('请填写领用日期', 'err');
+  if (!issuer) return App.toast('请填写领用人', 'err');
+  if (!itype) return App.toast('请选择领用类型', 'err');
+  return {
+    issue_date: $('#f_date').value,
+    tool_code: $('#f_code').value.trim(),
+    tool_name: $('#f_name').value.trim(),
+    issuer,
+    dept: $('#f_dept').value.trim(),
+    itype,
+    qty: Math.max(1, parseInt($('#f_qty').value) || 1),
+    purpose: $('#f_purpose').value.trim(),
+    remark: $('#f_remark').value.trim()
+  };
+}
+function resetForm() {
+  $('#f_code').value = ''; $('#f_name').value = ''; $('#f_issuer').value = '';
+  $('#f_dept').value = ''; $('#f_itype').value = '新领'; $('#f_qty').value = '1';
+  $('#f_purpose').value = ''; $('#f_remark').value = '';
+  $('#f_date').value = App.today();
+}
+async function save() {
+  const b = collect();
+  if (!b) return;
+  await App.post('/api/tool-issues', b);
+  App.toast('领用记录已保存', 'ok');
+  resetForm(); load();
+}
+
+async function load() {
+  const p = new URLSearchParams();
+  if ($('#q_itype').value) p.set('itype', $('#q_itype').value);
+  if ($('#q_issuer').value.trim()) p.set('issuer', $('#q_issuer').value.trim());
+  if ($('#q_tool').value.trim()) p.set('tool', $('#q_tool').value.trim());
+  if ($('#q_from').value) p.set('from', $('#q_from').value);
+  if ($('#q_to').value) p.set('to', $('#q_to').value);
+  rows = await App.get('/api/tool-issues?' + p);
+  const e = App.escapeHtml;
+  $('#tbody').innerHTML = rows.length ? rows.map((r, i) => `<tr>
+    <td>${i + 1}</td>
+    <td>${e(r.issue_date)}</td>
+    <td>${r.tool_code ? '<b>' + e(r.tool_code) + '</b>' : '-'}</td>
+    <td>${e(r.tool_name) || '-'}</td>
+    <td>${e(r.issuer)}</td>
+    <td>${e(r.dept) || '-'}</td>
+    <td><span class="itype-tag itype-${e(r.itype)}">${e(r.itype)}</span></td>
+    <td class="num">${r.qty}</td>
+    <td>${e(r.purpose) || '-'}</td>
+    <td>${e(r.remark) || '-'}</td>
+    <td>${e(r.created_by)}</td>
+    <td class="actions-col need-write">
+      <button class="btn sm ghost" onclick="openEdit(${r.id})">编辑</button>
+      <button class="btn sm red" onclick="delRow(${r.id})">删除</button>
+    </td>
+  </tr>`).join('') : '<tr><td colspan="12" class="empty-tip">暂无领用记录</td></tr>';
+}
+
+function openEdit(id) {
+  const r = rows.find(x => x.id === id);
+  if (!r) return;
+  $('#e_id').value = r.id;
+  $('#e_date').value = r.issue_date; $('#e_code').value = r.tool_code || '';
+  $('#e_name').value = r.tool_name || ''; $('#e_issuer').value = r.issuer;
+  $('#e_dept').value = r.dept || ''; $('#e_itype').value = r.itype;
+  $('#e_qty').value = r.qty; $('#e_purpose').value = r.purpose || '';
+  $('#e_remark').value = r.remark || '';
+  $('#editMask').style.display = 'flex';
+}
+function closeEdit() { $('#editMask').style.display = 'none'; }
+async function saveEdit() {
+  const id = $('#e_id').value;
+  const issuer = $('#e_issuer').value.trim();
+  if (!$('#e_date').value) return App.toast('请填写领用日期', 'err');
+  if (!issuer) return App.toast('请填写领用人', 'err');
+  await App.put('/api/tool-issues/' + id, {
+    issue_date: $('#e_date').value,
+    tool_code: $('#e_code').value.trim(),
+    tool_name: $('#e_name').value.trim(),
+    issuer,
+    dept: $('#e_dept').value.trim(),
+    itype: $('#e_itype').value,
+    qty: Math.max(1, parseInt($('#e_qty').value) || 1),
+    purpose: $('#e_purpose').value.trim(),
+    remark: $('#e_remark').value.trim()
+  });
+  App.toast('已保存', 'ok');
+  closeEdit(); load();
+}
+async function delRow(id) {
+  if (!confirm('确定删除该领用记录？')) return;
+  await App.del('/api/tool-issues/' + id);
+  App.toast('已删除', 'ok'); load();
+}
+
+function doExport() {
+  if (!rows.length) return App.toast('没有可导出的数据', 'err');
+  const range = ($('#q_from').value || '') + ($('#q_from').value || $('#q_to').value ? ' 至 ' : '') + ($('#q_to').value || '');
+  const e = App.escapeHtml;
+  App.exportExcel('小型工具领用表',
+    ['序号', '领用日期', '工具编号', '工具名称', '领用人', '班组/部门', '领用类型', '数量', '用途/工单号', '备注', '录入人'],
+    rows.map((r, i) => [i + 1, r.issue_date, r.tool_code, r.tool_name, r.issuer, r.dept, r.itype, +r.qty,
+      r.purpose, r.remark, r.created_by]),
+    '工具领用', {
+      title: '小型工具领用表',
+      meta: (range ? '日期范围：' + range : ''),
+      numCols: [7],
+      sign: ['领用人：', '仓库管理员：', '主管：']
+    });
+}
+
+load();
+</script>
+</body>
+</html>

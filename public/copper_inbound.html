@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>铜线入库记录</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.form-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.form-item { display: flex; flex-direction: column; gap: 4px; min-width: 150px; flex: 1; }
+.form-item label { font-size: 13px; color: var(--muted); }
+.form-item input, .form-item select { padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; }
+#editMask { position: fixed; inset: 0; background: rgba(20,30,45,.45); display: none; align-items: center; justify-content: center; z-index: 50; }
+#editMask .modal { background: #fff; border-radius: 14px; padding: 22px 24px; width: min(760px, 94vw); max-height: 90vh; overflow: auto; box-shadow: 0 16px 50px rgba(0,0,0,.25); }
+#editMask h3 { margin: 0 0 14px; color: var(--primary); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- 录入区 -->
+  <div class="card need-write no-print">
+    <h2>新增铜线入库记录 —— 仓库管理员填写</h2>
+    <div class="form-row">
+      <div class="form-item"><label><b>*</b> 入库日期</label><input type="date" id="f_date"></div>
+      <div class="form-item"><label><b>*</b> 铜线规格型号</label><input id="f_spec" class="spec-ac-input" autocomplete="off" placeholder="输入规格模糊筛选"></div>
+      <div class="form-item"><label><b>*</b> 入库重量(kg)</label><input type="number" id="f_qty" step="0.0001" min="0" placeholder="如 50"></div>
+      <div class="form-item"><label>单位</label><input id="f_unit" value="kg"></div>
+    </div>
+    <div class="form-row" style="margin-top:10px">
+      <div class="form-item"><label>供应商</label><input id="f_supplier" placeholder="供应商名称"></div>
+      <div class="form-item"><label>批次号</label><input id="f_batch" placeholder="入库批次号"></div>
+      <div class="form-item"><label>单价(元/kg)</label><input type="number" id="f_price" step="0.01" min="0" placeholder="可选"></div>
+      <div class="form-item" style="flex:2"><label>备注</label><input id="f_remark" placeholder="备注说明"></div>
+    </div>
+    <div style="margin-top:14px">
+      <button class="btn green" onclick="save()">✔ 保存入库记录</button>
+      <button class="btn ghost" onclick="resetForm()">清空</button>
+    </div>
+    <p style="color:var(--muted);font-size:12.5px;margin-top:10px">
+      说明：保存后系统会自动按规格<b>累计到「铜线库存」</b>（原库存 + 本次入库 = 最新库存）；同一规格的不同批次都会在此按入库日期留痕，方便按批次追溯。
+    </p>
+  </div>
+
+  <!-- 查询 + 列表 -->
+  <div class="card">
+    <div class="toolbar no-print">
+      <div class="form-item"><label>规格筛选</label><input id="q_spec" placeholder="模糊查询"></div>
+      <div class="form-item"><label>批次号</label><input id="q_batch" placeholder="批次号"></div>
+      <div class="form-item"><label>供应商</label><input id="q_supplier" placeholder="供应商"></div>
+      <div class="form-item"><label>日期从</label><input type="date" id="q_from"></div>
+      <div class="form-item"><label>到</label><input type="date" id="q_to"></div>
+      <button class="btn" onclick="load()">🔍 查询</button>
+      <span class="spacer"></span>
+      <button class="btn ghost" onclick="doExport()">📤 导出Excel</button>
+      <button class="btn ghost" onclick="App.print('铜线入库记录','')">🖨️ 打印</button>
+    </div>
+    <div class="print-header"></div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>
+          <th>序号</th><th>入库日期</th><th>铜线规格型号</th><th>入库重量(kg)</th><th>单位</th>
+          <th>供应商</th><th>批次号</th><th>单价(元/kg)</th><th>备注</th><th>录入人</th>
+          <th class="actions-col need-write">操作</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="print-sign">
+      <span>仓库管理员：＿＿＿＿＿＿</span><span>复核：＿＿＿＿＿＿</span><span>主管：＿＿＿＿＿＿</span>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑弹窗 -->
+<div id="editMask">
+  <div class="modal">
+    <h3>编辑铜线入库记录</h3>
+    <input type="hidden" id="e_id">
+    <div class="form-row">
+      <div class="form-item"><label>入库日期</label><input type="date" id="e_date"></div>
+      <div class="form-item"><label>铜线规格型号</label><input id="e_spec" class="spec-ac-input" autocomplete="off" placeholder="输入规格模糊筛选"></div>
+      <div class="form-item"><label>入库重量(kg)</label><input type="number" id="e_qty" step="0.0001" min="0"></div>
+      <div class="form-item"><label>单位</label><input id="e_unit"></div>
+    </div>
+    <div class="form-row" style="margin-top:10px">
+      <div class="form-item"><label>供应商</label><input id="e_supplier"></div>
+      <div class="form-item"><label>批次号</label><input id="e_batch"></div>
+      <div class="form-item"><label>单价(元/kg)</label><input type="number" id="e_price" step="0.01" min="0"></div>
+      <div class="form-item" style="flex:2"><label>备注</label><input id="e_remark"></div>
+    </div>
+    <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end">
+      <button class="btn green" onclick="saveEdit()">✔ 保存</button>
+      <button class="btn ghost" onclick="closeEdit()">取消</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/vendor/xlsx.full.min.js"></script>
+<script src="js/app.js"></script>
+<script src="js/spec-ac.js"></script>
+<script>
+App.nav('copper_inbound.html');
+let rows = [], SPECS = [];
+
+async function loadSpecs() { try { SPECS = window.SPECS = await App.get('/api/copper-specs'); } catch (e) { SPECS = []; } }
+$('#f_date').value = App.today();
+
+function collect() {
+  const spec = $('#f_spec').value.trim();
+  const date = $('#f_date').value;
+  const qty = parseFloat($('#f_qty').value);
+  if (!date) return App.toast('请填写入库日期', 'err');
+  if (!spec) return App.toast('请选择规格', 'err');
+  if (!SpecAC.isValid(spec)) return App.toast('请从下拉列表中选择有效的规格型号', 'err');
+  if (isNaN(qty) || qty <= 0) return App.toast('请填写大于 0 的入库重量', 'err');
+  return {
+    inbound_date: date,
+    spec,
+    qty,
+    unit: $('#f_unit').value.trim() || 'kg',
+    supplier: $('#f_supplier').value.trim(),
+    batch_no: $('#f_batch').value.trim(),
+    price: parseFloat($('#f_price').value) || 0,
+    remark: $('#f_remark').value.trim()
+  };
+}
+function resetForm() {
+  $('#f_spec').value = ''; $('#f_qty').value = ''; $('#f_unit').value = 'kg';
+  $('#f_supplier').value = ''; $('#f_batch').value = ''; $('#f_price').value = '';
+  $('#f_remark').value = ''; $('#f_date').value = App.today();
+  SpecAC.init($('#f_spec'));
+}
+async function save() {
+  const b = collect();
+  if (!b) return;
+  await App.post('/api/copper-inbound', b);
+  App.toast('入库记录已保存，库存已累加', 'ok');
+  resetForm(); load();
+}
+
+async function load() {
+  const p = new URLSearchParams();
+  if ($('#q_spec').value.trim()) p.set('spec', $('#q_spec').value.trim());
+  if ($('#q_batch').value.trim()) p.set('batch_no', $('#q_batch').value.trim());
+  if ($('#q_supplier').value.trim()) p.set('supplier', $('#q_supplier').value.trim());
+  if ($('#q_from').value) p.set('from', $('#q_from').value);
+  if ($('#q_to').value) p.set('to', $('#q_to').value);
+  rows = await App.get('/api/copper-inbound?' + p);
+  const e = App.escapeHtml;
+  $('#tbody').innerHTML = rows.length ? rows.map((r, i) => `<tr>
+    <td>${i + 1}</td>
+    <td>${e(r.inbound_date)}</td>
+    <td><b>${e(r.spec)}</b></td>
+    <td class="num">${App.fmt(r.qty)}</td>
+    <td>${e(r.unit)}</td>
+    <td>${e(r.supplier) || '-'}</td>
+    <td>${e(r.batch_no) || '-'}</td>
+    <td class="num">${(+r.price).toFixed(2)}</td>
+    <td>${e(r.remark) || '-'}</td>
+    <td>${e(r.created_by)}</td>
+    <td class="actions-col need-write">
+      <button class="btn sm ghost" onclick="openEdit(${r.id})">编辑</button>
+      <button class="btn sm red" onclick="delRow(${r.id})">删除</button>
+    </td>
+  </tr>`).join('') : '<tr><td colspan="11" class="empty-tip">暂无入库记录</td></tr>';
+}
+
+function openEdit(id) {
+  const r = rows.find(x => x.id === id);
+  if (!r) return;
+  $('#e_id').value = r.id;
+  $('#e_date').value = r.inbound_date; $('#e_spec').value = r.spec; SpecAC.init($('#e_spec'));
+  $('#e_qty').value = r.qty; $('#e_unit').value = r.unit;
+  $('#e_supplier').value = r.supplier || ''; $('#e_batch').value = r.batch_no || '';
+  $('#e_price').value = r.price || ''; $('#e_remark').value = r.remark || '';
+  $('#editMask').style.display = 'flex';
+}
+function closeEdit() { $('#editMask').style.display = 'none'; }
+async function saveEdit() {
+  const id = $('#e_id').value;
+  const spec = $('#e_spec').value.trim();
+  const date = $('#e_date').value;
+  const qty = parseFloat($('#e_qty').value);
+  if (!date) return App.toast('请填写入库日期', 'err');
+  if (!spec) return App.toast('请选择规格', 'err');
+  if (!SpecAC.isValid(spec)) return App.toast('请从下拉列表中选择有效的规格型号', 'err');
+  if (isNaN(qty) || qty <= 0) return App.toast('请填写大于 0 的入库重量', 'err');
+  await App.put('/api/copper-inbound/' + id, {
+    inbound_date: date, spec, qty,
+    unit: $('#e_unit').value.trim() || 'kg',
+    supplier: $('#e_supplier').value.trim(),
+    batch_no: $('#e_batch').value.trim(),
+    price: parseFloat($('#e_price').value) || 0,
+    remark: $('#e_remark').value.trim()
+  });
+  App.toast('已保存', 'ok');
+  closeEdit(); load();
+}
+async function delRow(id) {
+  if (!confirm('确定删除该入库记录？删除后对应规格的库存会回退该批次重量。')) return;
+  await App.del('/api/copper-inbound/' + id);
+  App.toast('已删除', 'ok'); load();
+}
+
+function doExport() {
+  if (!rows.length) return App.toast('没有可导出的数据', 'err');
+  const range = ($('#q_from').value || '') + ($('#q_from').value || $('#q_to').value ? ' 至 ' : '') + ($('#q_to').value || '');
+  const e = App.escapeHtml;
+  App.exportExcel('铜线入库记录',
+    ['序号', '入库日期', '铜线规格型号', '入库重量(kg)', '单位', '供应商', '批次号', '单价(元/kg)', '备注', '录入人'],
+    rows.map((r, i) => [i + 1, r.inbound_date, r.spec, +r.qty, r.unit, r.supplier, r.batch_no, +r.price,
+      r.remark, r.created_by]),
+    '铜线入库', {
+      title: '铜线入库记录',
+      meta: (range ? '日期范围：' + range : ''),
+      numCols: [3, 7],
+      sign: ['仓库管理员：', '复核：', '主管：']
+    });
+}
+
+(async () => { await loadSpecs(); SpecAC.init($('#f_spec')); load(); })();
+</script>
+</body>
+</html>

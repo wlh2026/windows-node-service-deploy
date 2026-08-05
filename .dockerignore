@@ -1,0 +1,15 @@
+# 构建镜像时忽略以下文件/目录
+node_modules
+npm-debug.log
+.git
+.gitignore
+*.db
+*.db-shm
+*.db-wal
+data/data.db
+data/data.db-shm
+data/data.db-wal
+docs
+*.md
+.vscode
+.workbuddy

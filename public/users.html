@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>用户管理</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <h2>新增用户</h2>
+    <div class="form-row">
+      <div class="form-item"><label><b>*</b> 用户名(登录账号)</label><input id="n_user"></div>
+      <div class="form-item"><label><b>*</b> 密码</label><input id="n_pass" type="text"></div>
+      <div class="form-item"><label><b>*</b> 姓名</label><input id="n_name"></div>
+      <div class="form-item"><label>角色</label>
+        <select id="n_role">
+          <option value="production">生产车间（仅铜线出入库台账）</option>
+          <option value="warehouse">仓库管理员（仅小型工具管理台账）</option>
+          <option value="quality">品质部（仅物料重量统计）</option>
+          <option value="admin">系统管理员（全部模块）</option>
+        </select></div>
+      <div class="form-item"><label>部门</label><input id="n_dept"></div>
+      <button class="btn green" style="align-self:end" onclick="addUser()">添加</button>
+    </div>
+    <p style="color:var(--muted);font-size:12.5px">
+      权限说明：生产车间＝只能看到并操作「生产对比表」；仓库管理员＝只能看到并操作「工具档案、借用归还、维修报废、盘点、统计报表」（工具台账模块）；系统管理员＝全部模块（含仓库领用表）＋用户管理＋数据备份。
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>用户列表</h2>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>ID</th><th>用户名</th><th>姓名</th><th>角色</th><th>部门</th><th>创建时间</th><th>操作</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>版本管理</h2>
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <div>当前版本：<b id="curVer" style="color:var(--primary-dark);font-size:18px">…</b></div>
+      <div style="color:var(--muted);font-size:12.5px">程序设计：<b>吴灵华</b></div>
+    </div>
+    <div class="form-row">
+      <div class="form-item" style="flex:1 1 100%">
+        <label>本次更新说明（点击"叠加新版本"后会自动 +0.0.1，每8次进位到大版本）</label>
+        <input id="bump_desc" placeholder="例：生产表增加电机类型与线模尺寸字段">
+      </div>
+      <button class="btn green" style="align-self:end" onclick="bumpVersion()">➕ 叠加新版本</button>
+    </div>
+    <h3 style="margin:14px 0 8px">更新日志</h3>
+    <div class="table-wrap" style="max-height:300px;overflow-y:auto">
+      <table class="data">
+        <thead><tr><th style="width:120px">版本号</th><th style="width:130px">日期</th><th>更新说明</th></tr></thead>
+        <tbody id="changelog"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>铜线规格管理（下拉选项）</h2>
+    <p style="color:var(--muted);font-size:12.5px">
+      铜线规格型号是「仓库领用表」与「生产对比表」的下拉选项，员工只能从列表中选择、不能自行输入。如需新增规格，请在此添加。
+    </p>
+    <div class="form-row">
+      <div class="form-item" style="flex:1 1 100%"><label>新增规格型号</label><input id="n_spec" placeholder="如 QZ-2-130L-0.50mm"></div>
+      <button class="btn green" style="align-self:end" onclick="addSpec()">＋ 添加规格</button>
+    </div>
+    <div class="table-wrap" style="max-height:240px;overflow-y:auto">
+      <table class="data">
+        <thead><tr><th>规格型号</th><th>添加时间</th><th>操作</th></tr></thead>
+        <tbody id="specBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>数据备份与恢复</h2>
+    <p style="color:var(--muted);font-size:12.5px">
+      系统每天 <b>15:00</b> 自动将数据库备份到服务器本地 <code>backups/</code> 目录，保留最近 30 份。管理员可随时手动下载当前备份、从本地 <code>.db</code> 文件恢复，或从下方自动备份中一键恢复／下载／删除（恢复前系统会先自动备份当前数据以便回退）。
+    </p>
+    <div class="form-row" style="align-items:center;flex-wrap:wrap;gap:12px">
+      <button class="btn green" onclick="manualBackup()">💾 下载当前备份</button>
+      <label class="btn" style="cursor:pointer">📥 选择备份文件恢复
+        <input id="restoreFile" type="file" accept=".db" style="display:none" onchange="restoreFromFile()">
+      </label>
+      <span id="restoreHint" style="color:var(--muted);font-size:12.5px"></span>
+    </div>
+    <h3 style="margin:16px 0 8px">自动备份列表（每天 15:00）</h3>
+    <div class="table-wrap" style="max-height:320px;overflow-y:auto">
+      <table class="data">
+        <thead><tr><th>文件名</th><th>大小</th><th>生成时间</th><th>操作</th></tr></thead>
+        <tbody id="backupList"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑弹窗 -->
+<div class="modal-mask" id="mask" style="display:none">
+  <div class="modal" style="max-width:460px">
+    <h3>编辑用户</h3>
+    <div class="form-row">
+      <div class="form-item"><label>姓名</label><input id="e_name"></div>
+      <div class="form-item"><label>角色</label>
+        <select id="e_role">
+          <option value="production">生产车间</option><option value="warehouse">仓库管理员</option><option value="quality">品质部</option>
+          <option value="admin">系统管理员</option>
+        </select></div>
+      <div class="form-item"><label>部门</label><input id="e_dept"></div>
+      <div class="form-item"><label>重置密码(留空不改)</label><input id="e_pass"></div>
+    </div>
+    <div class="actions">
+      <button class="btn ghost" onclick="$('#mask').style.display='none'">取消</button>
+      <button class="btn" onclick="saveEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+App.nav('users.html');
+let list = [], editId = null;
+const roleName = { admin: '系统管理员', production: '生产车间', warehouse: '仓库管理员', quality: '品质部' };
+
+async function load() {
+  list = await App.get('/api/users');
+  const e = App.escapeHtml;
+  $('#tbody').innerHTML = list.map(u => `<tr>
+    <td>${u.id}</td><td>${e(u.username)}</td><td>${e(u.name)}</td>
+    <td><span class="tag ${u.role === 'admin' ? 'fix' : u.role === 'warehouse' ? 'out' : u.role === 'quality' ? 'q' : 'in'}">${roleName[u.role] || u.role}</span></td>
+    <td>${e(u.dept)}</td><td>${u.created_at}</td>
+    <td><button class="btn sm ghost" onclick="openEdit(${u.id})">编辑</button>
+    ${u.username !== 'admin' ? `<button class="btn sm red" onclick="delUser(${u.id})">删除</button>` : ''}</td></tr>`).join('');
+}
+async function addUser() {
+  if (!$('#n_user').value.trim() || !$('#n_pass').value || !$('#n_name').value.trim())
+    return App.toast('用户名/密码/姓名必填', 'err');
+  await App.post('/api/users', {
+    username: $('#n_user').value.trim(), password: $('#n_pass').value,
+    name: $('#n_name').value.trim(), role: $('#n_role').value, dept: $('#n_dept').value.trim()
+  });
+  App.toast('已添加', 'ok');
+  ['n_user', 'n_pass', 'n_name', 'n_dept'].forEach(i => $('#' + i).value = '');
+  load();
+}
+function openEdit(id) {
+  const u = list.find(x => x.id === id); if (!u) return;
+  editId = id;
+  $('#e_name').value = u.name; $('#e_role').value = u.role; $('#e_dept').value = u.dept; $('#e_pass').value = '';
+  $('#mask').style.display = 'flex';
+}
+async function saveEdit() {
+  await App.put('/api/users/' + editId, {
+    name: $('#e_name').value, role: $('#e_role').value, dept: $('#e_dept').value, password: $('#e_pass').value
+  });
+  $('#mask').style.display = 'none'; App.toast('已保存', 'ok'); load();
+}
+async function delUser(id) {
+  if (!confirm('确定删除该用户？')) return;
+  await App.del('/api/users/' + id); App.toast('已删除', 'ok'); load();
+}
+
+async function loadVersion() {
+  const info = await App.get('/api/version');
+  $('#curVer').textContent = 'v' + info.version;
+  const e = App.escapeHtml;
+  $('#changelog').innerHTML = [...info.changelog].reverse().map(c =>
+    `<tr><td><b>${e(c.version)}</b></td><td>${e(c.date)}</td><td>${e(c.changes)}</td></tr>`
+  ).join('') || '<tr><td colspan="3" class="empty-tip">暂无更新记录</td></tr>';
+}
+async function bumpVersion() {
+  const changes = $('#bump_desc').value.trim();
+  if (!changes) return App.toast('请填写本次更新说明', 'err');
+  await App.post('/api/version/bump', { changes });
+  $('#bump_desc').value = '';
+  App.toast('版本已更新', 'ok');
+  loadVersion();
+  // 刷新顶部版本徽章
+  setTimeout(() => location.reload(), 800);
+}
+async function manualBackup() {
+  const r = await fetch('/api/backup', { headers: { 'X-Token': App.token } });
+  if (!r.ok) return App.toast('备份下载失败', 'err');
+  const blob = await r.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'backup-' + new Date().toISOString().slice(0, 10) + '.db';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(a.href);
+  App.toast('数据库备份已下载', 'ok');
+}
+async function loadBackups() {
+  const list = await App.get('/api/backups');
+  const e = App.escapeHtml;
+  $('#backupList').innerHTML = list.map(f => `<tr>
+    <td>${e(f.name)}</td>
+    <td>${(f.size / 1024).toFixed(1)} KB</td>
+    <td>${new Date(f.mtime).toLocaleString('zh-CN')}</td>
+    <td>
+      <button class="btn sm ghost" onclick="dlBackup('${encodeURIComponent(f.name)}')">下载</button>
+      <button class="btn sm" onclick="restoreByName('${encodeURIComponent(f.name)}')">恢复</button>
+      <button class="btn sm red" onclick="delBackup('${encodeURIComponent(f.name)}')">删除</button>
+    </td></tr>`).join('') || '<tr><td colspan="4" class="empty-tip">暂无自动备份</td></tr>';
+}
+function dlBackup(name) {
+  const a = document.createElement('a');
+  a.download = decodeURIComponent(name);
+  fetch('/api/backups/' + name + '/download', { headers: { 'X-Token': App.token } })
+    .then(r => r.blob()).then(b => { a.href = URL.createObjectURL(b); a.click(); URL.revokeObjectURL(a.href); });
+}
+async function restoreFromFile() {
+  const inp = $('#restoreFile');
+  if (!inp.files.length) return;
+  if (!confirm('恢复将覆盖当前数据库（系统会先自动备份当前数据以便回退）。确定继续？')) { inp.value = ''; return; }
+  const file = inp.files[0];
+  $('#restoreHint').textContent = '正在恢复…';
+  const r = await fetch('/api/restore', { method: 'POST', headers: { 'X-Token': App.token }, body: file });
+  const j = await r.json().catch(() => ({ ok: false }));
+  inp.value = ''; $('#restoreHint').textContent = '';
+  if (j.ok) { App.toast('数据已恢复，正在刷新…', 'ok'); setTimeout(() => location.reload(), 1200); }
+  else App.toast(j.msg || '恢复失败', 'err');
+}
+async function restoreByName(name) {
+  if (!confirm('从备份「' + decodeURIComponent(name) + '」恢复将覆盖当前数据（系统会先自动备份当前数据）。确定？')) return;
+  const r = await fetch('/api/restore?name=' + name, { method: 'POST', headers: { 'X-Token': App.token, 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+  const j = await r.json().catch(() => ({ ok: false }));
+  if (j.ok) { App.toast('已恢复，正在刷新…', 'ok'); setTimeout(() => location.reload(), 1200); }
+  else App.toast(j.msg || '恢复失败', 'err');
+}
+async function delBackup(name) {
+  if (!confirm('确定删除备份「' + decodeURIComponent(name) + '」？')) return;
+  await App.del('/api/backups/' + name);
+  App.toast('已删除', 'ok'); loadBackups();
+}
+
+load();
+loadVersion();
+loadBackups();
+loadSpecs();
+
+async function loadSpecs() {
+  const list = await App.get('/api/copper-specs');
+  const e = App.escapeHtml;
+  $('#specBody').innerHTML = list.length
+    ? list.map(s => `<tr><td><b>${e(s.spec)}</b></td><td>${e(s.created_at)}</td>
+        <td><button class="btn sm red" onclick="delSpec(${s.id})">删除</button></td></tr>`).join('')
+    : '<tr><td colspan="3" class="empty-tip">暂无规格</td></tr>';
+}
+async function addSpec() {
+  const v = $('#n_spec').value.trim();
+  if (!v) return App.toast('请输入规格型号', 'err');
+  await App.post('/api/copper-specs', { spec: v });
+  $('#n_spec').value = ''; App.toast('已添加规格', 'ok'); loadSpecs();
+}
+async function delSpec(id) {
+  if (!confirm('确定删除该规格？已录入的领用/生产记录仍会保留该规格文本。')) return;
+  await App.del('/api/copper-specs/' + id); App.toast('已删除', 'ok'); loadSpecs();
+}
+</script>
+</body>
+</html>
