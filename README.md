@@ -142,3 +142,14 @@ node --experimental-sqlite server.js
 ## 许可
 
 本项目供内部车间管理使用，遵循仓库所属许可协议。如有定制需求请联系作者。
+
+---
+
+## ☕ 支持作者
+
+如果本系统对您的工作有帮助，欢迎通过微信支付打赏支持作者继续开发与维护。
+
+<p align="center">
+  <img src="docs/wechat-donate.jpg" width="360" alt="微信支付赞赏码" />
+</p>
+<p align="center">微信支付 · 扫码赞赏 · 感谢支持 ❤️</p>
