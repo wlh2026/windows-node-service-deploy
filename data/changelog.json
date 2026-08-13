@@ -1,5 +1,10 @@
 [
   {
+    "version": "1.0.13",
+    "date": "2026-08-13",
+    "changes": "修复铜线三模块（库存/领用表/入库记录）模糊查询不一致：实测确认非全角字符、也非 SQL 转义问题，根因是 QZY-2-180 系列共 4 个规格（0.3/0.35/0.53/0.80mm）经 Excel 导入等方式直接进入业务表，却未写入 copper_specs 规格主数据，导致 SpecAC 下拉只认主数据、永远不提示这些型号；而后端 LIKE '%关键字%' 查询本身正常（库存中 QZY-2-180-0.35mm 有库存且能被查到）。修复：① GET /api/copper-specs 改为返回「主数据 ∪ 三张铜线表实际存在的规格」（server.js 已包含，本次随部署生效），保证任何有记录的型号都能在模糊下拉中出现；② 种子 wire-specs.js 补回这 4 个 QZY-2-180 规格，保证全新部署主数据完整；③ 线上库已通过接口把 4 个规格补录进 copper_specs，下拉即时恢复。查询期做规格归一化（全角点/括号→半角、去空白）作为防御，不改历史数据。"
+  },
+  {
     "version": "1.0.12",
     "date": "2026-07-31",
     "changes": "新增 Windows Server 2012 R2 部署辅助包（factory-app/deploy/）：因后端用 Node 内置 node:sqlite，必须 Node 22.5+ 且以 --experimental-sqlite 启动，而 Node 仅官方支持 Windows 8.1/Server 2012 R2 及以上。部署包含 start.bat（前台手动启动）、install-service.bat（用 NSSM 注册为 Windows 服务，开机自启+崩溃自动重启，首次自动下载 NSSM）、uninstall-service.bat、open-firewall.bat（放行 TCP 8090），以及 README.md 部署说明（含 Node 版本校验、DATA_DIR 数据分离、自动备份、迁移与故障排查）。原版 Server 2012 不受支持，需升级系统。"
