@@ -14,6 +14,16 @@
     return arr.map(s => (typeof s === 'string' ? s : s.spec));
   }
 
+  // 规格归一化（与后端 server.js 的 normSpec 保持一致）：全角点/括号→半角、去空白
+  function normSpec(s) {
+    return (s == null ? '' : String(s))
+      .replace(/[．・‧･]/g, '.')
+      .replace(/[（]/g, '(')
+      .replace(/[）]/g, ')')
+      .replace(/\s+/g, '')
+      .toLowerCase();
+  }
+
   function buildList() {
     if (sharedList) return sharedList;
     const list = document.createElement('div');
@@ -41,10 +51,12 @@
   }
 
   function filter(q) {
-    q = (q || '').trim().toLowerCase();
+    q = (q || '').trim();
     const all = specs();
-    if (!q) return all.slice(0, 60);          // 无输入展示前 60 条
-    const out = all.filter(s => s.toLowerCase().includes(q));
+    const nq = normSpec(q);
+    if (!nq) return all.slice(0, 60);          // 无输入展示前 60 条
+    // 归一化后包含匹配：全角点/全角括号/空白差异不再影响模糊查询
+    const out = all.filter(s => normSpec(s).includes(nq));
     return out.length ? out : all.slice(0, 60); // 无匹配时回退展示全部
   }
 

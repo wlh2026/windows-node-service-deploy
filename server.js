@@ -283,6 +283,20 @@ function readRaw(req, limit) {
 }
 const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
 const esc = v => (v == null ? '' : String(v).trim());
+// 规格归一化：全角点/中点→半角点、全角括号→半角括号、去空白，用于模糊查询一致匹配
+// （Excel 导入或手工录入可能带入全角字符/首尾空格，导致同一型号“查不到”）
+function normSpec(s) {
+  return (s == null ? '' : String(s))
+    .replace(/[．・‧･]/g, '.')   // 全角点 U+FF0E / 中点 / 间隔号 → 半角点
+    .replace(/[（]/g, '(')        // 全角左括号 → 半角
+    .replace(/[）]/g, ')')        // 全角右括号 → 半角
+    .replace(/\s+/g, '')          // 去除所有空白
+    .toLowerCase();
+}
+// 生成 SQL 中对某列做相同归一化的表达式，配合 normSpec(查询词) 一起使用
+function specCol(col) {
+  return `REPLACE(REPLACE(REPLACE(${col}, '．', '.'), '（', '('), '）', ')')`;
+}
 // 铜线库存自动扣减：确保规格库存行存在，并按净变动量调整（net = 回库 - 领出）
 function ensureInventory(spec) {
   const s = esc(spec);
@@ -522,7 +536,7 @@ function listQuery(res, table, q, extraWhere) {
   const conds = [], args = [];
   if (q.get('from')) { conds.push('rec_date>=?'); args.push(q.get('from')); }
   if (q.get('to')) { conds.push('rec_date<=?'); args.push(q.get('to')); }
-  if (q.get('spec')) { conds.push('wire_spec LIKE ?'); args.push('%' + q.get('spec') + '%'); }
+  if (q.get('spec')) { conds.push(specCol('wire_spec') + ' LIKE ?'); args.push('%' + normSpec(q.get('spec')) + '%'); }
   if (extraWhere) extraWhere(conds, args, q);
   const where = conds.length ? ' WHERE ' + conds.join(' AND ') : '';
   const rows = db.prepare(`SELECT * FROM ${table}${where} ORDER BY rec_date DESC, id DESC LIMIT 2000`).all(...args);
@@ -602,7 +616,14 @@ route('DELETE', /^\/api\/warehouse\/(\d+)$/, (req, res, m) => {
 
 /* ---- 铜线规格主数据（下拉，管理员可维护） ---- */
 route('GET', /^\/api\/copper-specs$/, (req, res) => {
-  ok(res, db.prepare('SELECT id, spec, created_at FROM copper_specs ORDER BY spec').all());
+  // 合并：主数据表 + 三个铜线业务表中实际存在的规格，确保“有记录的型号都能在下拉/模糊查询中出现”
+  const set = new Set();
+  for (const r of db.prepare('SELECT spec FROM copper_specs').all()) if (r.spec) set.add(r.spec);
+  for (const r of db.prepare('SELECT DISTINCT spec FROM copper_inventory').all()) if (r.spec) set.add(r.spec);
+  for (const r of db.prepare('SELECT DISTINCT wire_spec FROM warehouse_records').all()) if (r.spec) set.add(r.wire_spec);
+  for (const r of db.prepare('SELECT DISTINCT spec FROM copper_inbound').all()) if (r.spec) set.add(r.spec);
+  const specs = [...set].sort((a, b) => a.localeCompare(b, 'zh'));
+  ok(res, specs.map((s, i) => ({ id: i + 1, spec: s, created_at: '' })));
 }, 'common');
 route('POST', /^\/api\/copper-specs$/, async (req, res) => {
   const b = await readBody(req);
@@ -619,7 +640,7 @@ route('DELETE', /^\/api\/copper-specs\/(\d+)$/, (req, res, m) => {
 /* ---- 铜线库存（录入/查看/编辑，领用自动扣减） ---- */
 route('GET', /^\/api\/copper-inventory$/, (req, res, m, user, q) => {
   const conds = [], args = [];
-  if (q.get('spec')) { conds.push('spec LIKE ?'); args.push('%' + q.get('spec') + '%'); }
+  if (q.get('spec')) { conds.push(specCol('spec') + ' LIKE ?'); args.push('%' + normSpec(q.get('spec')) + '%'); }
   const where = conds.length ? ' WHERE ' + conds.join(' AND ') : '';
   ok(res, db.prepare(`SELECT * FROM copper_inventory${where} ORDER BY stock DESC, spec`).all(...args));
 }, 'copper_wh');
@@ -697,7 +718,7 @@ function addCopperStock(spec, qty, unit, remark) {
 }
 route('GET', /^\/api\/copper-inbound$/, (req, res, m, user, q) => {
   const conds = [], args = [];
-  if (q.get('spec')) { conds.push('spec LIKE ?'); args.push('%' + q.get('spec') + '%'); }
+  if (q.get('spec')) { conds.push(specCol('spec') + ' LIKE ?'); args.push('%' + normSpec(q.get('spec')) + '%'); }
   if (q.get('batch_no')) { conds.push('batch_no LIKE ?'); args.push('%' + q.get('batch_no') + '%'); }
   if (q.get('supplier')) { conds.push('supplier LIKE ?'); args.push('%' + q.get('supplier') + '%'); }
   if (q.get('from')) { conds.push('inbound_date>=?'); args.push(q.get('from')); }
